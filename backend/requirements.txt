@@ -1,0 +1,13 @@
+Flask
+openai
+SpeechRecognition
+face_recognition
+opencv-python
+scikit-learn
+tensorflow
+pyttsx3
+schedule
+google-api-python-client
+google-auth
+google-auth-oauthlib
+google-auth-httplib2

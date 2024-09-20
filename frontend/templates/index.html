@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MAX AI</title>
+    <link rel="stylesheet" href="../static/css/styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>MAX AI</h1>
+        <!-- Cool hologram effect for the assistant trigger -->
+        <div class="hologram-container" id="hologram" role="button" aria-label="Activate MAX AI"></div>
+        <!-- Face scanning animation -->
+        <div id="face-scan-animation" class="face-scan-animation hidden">
+            <div class="spinner"></div>
+            <p>Scanning for face...</p>
+        </div>
+        <p id="output">How can I help you?</p>
+    </div>
+
+    <script>
+        if (!('webkitSpeechRecognition' in window)) {
+            alert("Speech recognition not supported in this browser.");
+        }
+
+        document.getElementById('hologram').addEventListener('click', function() {
+            startFaceUnlock();  // Trigger face recognition
+        });
+
+        function startFaceUnlock() {
+            // Show the face scan animation
+            document.getElementById('face-scan-animation').classList.remove('hidden');
+
+            // Call the face unlock API
+            fetch('http://localhost:5000/api/face-unlock')  // Ensure this URL matches your Flask server
+                .then(response => response.json())
+                .then(data => {
+                    // Hide the face scan animation
+                    document.getElementById('face-scan-animation').classList.add('hidden');
+
+                    if (data.verified) {
+                        startRecognition();  // Start voice recognition if face is verified
+                    } else {
+                        document.getElementById('output').textContent = "Face verification failed. Access denied.";
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    document.getElementById('output').textContent = "Error during face verification.";
+                    document.getElementById('face-scan-animation').classList.add('hidden');
+                });
+        }
+
+        function startRecognition() {
+            var recognition = new webkitSpeechRecognition();
+            recognition.lang = "en-US";
+            recognition.start();
+
+            recognition.onresult = function(event) {
+                var transcript = event.results[0][0].transcript;
+                document.getElementById('output').textContent = "You said: " + transcript;
+                processCommand(transcript);  // Process spoken command
+            };
+
+            recognition.onerror = function(event) {
+                console.error("Speech recognition error: ", event.error);
+                document.getElementById('output').textContent = "Error recognizing speech.";
+            };
+        }
+
+        function processCommand(command) {
+            fetch('http://localhost:5000/api/voice-command', {  // Ensure this is the correct URL
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ command: command })
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('output').textContent = data.response;
+                var speech = new SpeechSynthesisUtterance(data.response);
+                window.speechSynthesis.speak(speech);
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                document.getElementById('output').textContent = "Error processing command";
+            });
+        }
+    </script>
+</body>
+</html>
