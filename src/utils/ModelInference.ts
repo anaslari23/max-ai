@@ -1,30 +1,35 @@
 
-import { pipeline, env } from '@huggingface/transformers';
+import { pipeline, env, PipelineType } from '@huggingface/transformers';
 
 // Configure Hugging Face Transformers.js
 env.allowLocalModels = false;
 env.useBrowserCache = true;
 
-// Model types and configurations
-interface ModelConfig {
-  task: string;
+// Define proper types for model configurations
+interface BaseModelConfig {
+  task: PipelineType;
   model: string;
-  quantized?: boolean;
 }
 
-// Available pre-trained models
-const MODELS = {
+interface QuantizedModelConfig extends BaseModelConfig {
+  quantized: boolean;
+}
+
+type ModelConfig = BaseModelConfig | QuantizedModelConfig;
+
+// Available pre-trained models with proper typing
+const MODELS: Record<string, ModelConfig> = {
   textGeneration: {
-    task: 'text-generation',
+    task: 'text-generation' as PipelineType,
     model: 'HuggingFaceH4/zephyr-7b-beta',
     quantized: true
   },
   sentimentAnalysis: {
-    task: 'text-classification',
+    task: 'text-classification' as PipelineType,
     model: 'distilbert-base-uncased-finetuned-sst-2-english'
   },
   questionAnswering: {
-    task: 'question-answering',
+    task: 'question-answering' as PipelineType,
     model: 'distilbert-base-cased-distilled-squad'
   }
 };
@@ -69,10 +74,15 @@ class ModelInference {
       const initPromise = (async () => {
         try {
           // Load the model using transformers.js pipeline
+          // Use proper typing and check if the model has the quantized property
+          const options = 'quantized' in modelConfig ? 
+            { quantized: modelConfig.quantized } : 
+            {};
+          
           const model = await pipeline(
             modelConfig.task,
             modelConfig.model,
-            { quantized: modelConfig.quantized }
+            options
           );
           
           this.models.set(modelType, model);
