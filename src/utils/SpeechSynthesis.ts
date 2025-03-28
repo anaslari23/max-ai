@@ -3,6 +3,8 @@ class SpeechSynthesis {
   private synthesis: Window['speechSynthesis'];
   private voices: SpeechSynthesisVoice[] = [];
   private preferredVoice: SpeechSynthesisVoice | null = null;
+  private rate: number = 1.0;
+  private pitch: number = 1.0;
   
   constructor() {
     this.synthesis = window.speechSynthesis;
@@ -12,6 +14,10 @@ class SpeechSynthesis {
     if (speechSynthesis.onvoiceschanged !== undefined) {
       speechSynthesis.onvoiceschanged = this.loadVoices.bind(this);
     }
+    
+    // Set initial rate and pitch for clearer speech
+    this.rate = 0.95; // Slightly slower for better clarity
+    this.pitch = 1.05; // Slightly higher pitch
   }
   
   private loadVoices() {
@@ -25,32 +31,60 @@ class SpeechSynthesis {
     ) || null;
     
     if (!this.preferredVoice && this.voices.length > 0) {
-      // Fallback to first available voice
-      this.preferredVoice = this.voices[0];
+      // Try to find any good quality voice as a fallback
+      const qualityVoices = this.voices.filter(v => 
+        v.name.includes('Google') || 
+        v.name.includes('Microsoft') ||
+        v.name.includes('Alex') ||
+        v.name.includes('Samantha')
+      );
+      
+      if (qualityVoices.length > 0) {
+        this.preferredVoice = qualityVoices[0];
+      } else {
+        // Last resort: use first available voice
+        this.preferredVoice = this.voices[0];
+      }
     }
+    
+    console.log("Selected voice:", this.preferredVoice?.name);
   }
   
   public speak(text: string, onEnd?: () => void) {
     if (!this.synthesis) {
       console.error('Speech synthesis not supported');
+      if (onEnd) onEnd();
       return;
     }
     
     // Cancel any ongoing speech
     this.synthesis.cancel();
     
-    const utterance = new SpeechSynthesisUtterance(text);
+    // Add pauses at punctuation to make speech more natural
+    const processedText = this.addPauses(text);
+    
+    const utterance = new SpeechSynthesisUtterance(processedText);
     
     if (this.preferredVoice) {
       utterance.voice = this.preferredVoice;
     }
     
-    utterance.rate = 1.0;
-    utterance.pitch = 1.0;
+    utterance.rate = this.rate;
+    utterance.pitch = this.pitch;
     utterance.volume = 1.0;
     
     if (onEnd) {
       utterance.onend = onEnd;
+      
+      // Safety timeout in case onend doesn't fire
+      setTimeout(() => {
+        if (this.synthesis.speaking) {
+          // If still speaking after 15 seconds, force end
+          console.log("Forcing speech end due to timeout");
+          this.synthesis.cancel();
+          onEnd();
+        }
+      }, 15000);
     }
     
     this.synthesis.speak(utterance);
@@ -60,12 +94,33 @@ class SpeechSynthesis {
     };
   }
   
+  // Helper method to add slight pauses at punctuation
+  private addPauses(text: string): string {
+    // Add commas at logical places for pauses
+    return text
+      .replace(/\.\s+/g, '. , ') // Add pause after periods
+      .replace(/\!\s+/g, '! , ') // Add pause after exclamation marks
+      .replace(/\?\s+/g, '? , '); // Add pause after question marks
+  }
+  
   public getVoices(): SpeechSynthesisVoice[] {
     return this.voices;
   }
   
   public setVoice(voice: SpeechSynthesisVoice) {
     this.preferredVoice = voice;
+  }
+  
+  public setRate(rate: number) {
+    if (rate >= 0.5 && rate <= 2.0) {
+      this.rate = rate;
+    }
+  }
+  
+  public setPitch(pitch: number) {
+    if (pitch >= 0.5 && pitch <= 2.0) {
+      this.pitch = pitch;
+    }
   }
   
   public cancel() {

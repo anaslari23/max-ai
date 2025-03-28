@@ -30,7 +30,8 @@ const MaxCore: React.FC = () => {
     speechSynthesis.current = new SpeechSynthesis();
     
     if (voiceRecognition.current) {
-      voiceRecognition.current.setConfidenceThreshold(0.4);
+      voiceRecognition.current.setConfidenceThreshold(0.3);
+      voiceRecognition.current.setMaxConsecutiveLowConfidence(4);
     }
     
     voiceRecognition.current.onWake(() => {
@@ -94,13 +95,26 @@ const MaxCore: React.FC = () => {
       voiceRecognition.current.onResult((text) => {
         console.log("Received text:", text);
         if (text && text.length > 2) {
-          const cleanedText = text.replace(/hey max|wake up max|good morning max|hi max|hello max|max/gi, '').trim();
-          if (cleanedText) {
+          const wakeWordPattern = /\b(hey max|wake up max|good morning max|hi max|hello max|max)\b/gi;
+          const cleanedText = text.replace(wakeWordPattern, '').trim();
+          
+          if (cleanedText && cleanedText.length > 2) {
             console.log("Cleaned text:", cleanedText);
             setInput(cleanedText);
             
-            handleSend(cleanedText);
-            stopListening();
+            setTimeout(() => {
+              handleSend(cleanedText);
+              stopListening();
+            }, 500);
+          } else {
+            console.log("Text too short after cleaning, continuing to listen");
+            if (isListening) {
+              setTimeout(() => {
+                if (isListening) {
+                  stopListening();
+                }
+              }, 5000);
+            }
           }
         }
       });
@@ -109,7 +123,7 @@ const MaxCore: React.FC = () => {
         if (isListening) {
           stopListening();
         }
-      }, 12000);
+      }, 15000);
     }
   };
 

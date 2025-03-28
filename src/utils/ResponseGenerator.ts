@@ -112,6 +112,9 @@ const calculationRegex = {
 class ConversationContext {
   private topics: string[] = [];
   private lastTopic: string = '';
+  private lastInput: string = '';
+  private lastResponse: string = '';
+  private consecutiveFallbacks: number = 0;
   
   public addTopic(topic: string) {
     this.lastTopic = topic;
@@ -131,9 +134,40 @@ class ConversationContext {
     return [...this.topics];
   }
   
+  public setLastInput(input: string) {
+    this.lastInput = input;
+  }
+  
+  public getLastInput(): string {
+    return this.lastInput;
+  }
+  
+  public setLastResponse(response: string) {
+    this.lastResponse = response;
+  }
+  
+  public getLastResponse(): string {
+    return this.lastResponse;
+  }
+  
+  public incrementFallbacks() {
+    this.consecutiveFallbacks++;
+  }
+  
+  public resetFallbacks() {
+    this.consecutiveFallbacks = 0;
+  }
+  
+  public getFallbackCount(): number {
+    return this.consecutiveFallbacks;
+  }
+  
   public clear() {
     this.topics = [];
     this.lastTopic = '';
+    this.lastInput = '';
+    this.lastResponse = '';
+    this.consecutiveFallbacks = 0;
   }
 }
 
@@ -142,12 +176,16 @@ class ResponseGenerator {
   private static useModelInference = true; // Toggle to use model inference
   
   static async getResponse(input: string): Promise<ResponseData> {
+    // Store input in context
+    this.context.setLastInput(input);
+    
     // Normalize input
     const normalizedInput = input.toLowerCase().trim();
     
     // Check for calculation requests first
     const calculationResult = this.handleCalculation(normalizedInput);
     if (calculationResult) {
+      this.context.resetFallbacks();
       return { text: calculationResult, shouldSpeak: true };
     }
     
@@ -158,6 +196,7 @@ class ResponseGenerator {
       if (pattern.test(normalizedInput)) {
         category = cat;
         this.context.addTopic(cat);
+        this.context.resetFallbacks();
         break;
       }
     }
@@ -167,10 +206,15 @@ class ResponseGenerator {
       const lastTopic = this.context.getLastTopic();
       if (lastTopic && patterns[lastTopic as keyof typeof patterns]?.test(normalizedInput)) {
         category = lastTopic;
+        this.context.resetFallbacks();
       } else {
         category = 'fallback';
+        this.context.incrementFallbacks();
       }
     }
+    
+    // If we have multiple consecutive fallbacks, try to use model inference for better responses
+    const useFallbackInference = this.context.getFallbackCount() > 1;
     
     // Try to use model inference for generating responses if it's a fallback
     // or for certain categories that benefit from more natural responses
@@ -178,11 +222,17 @@ class ResponseGenerator {
       if (this.useModelInference && 
           (category === 'fallback' || 
            category === 'capabilities' || 
-           category === 'identity')) {
+           category === 'identity' ||
+           useFallbackInference)) {
         console.log('Using model inference for response generation');
         
         // Add some context to the prompt for better responses
         let prompt = `You are Max, an advanced AI assistant. The user says: "${input}". `;
+        
+        // Add conversation context for better context awareness
+        if (this.context.getLastInput() && this.context.getLastResponse()) {
+          prompt += `Recently, the user said "${this.context.getLastInput()}" and I responded "${this.context.getLastResponse()}". `;
+        }
         
         if (category === 'capabilities') {
           prompt += 'Explain what you can do as an AI assistant in a friendly, conversational way.';
@@ -195,6 +245,8 @@ class ResponseGenerator {
         try {
           const generatedText = await modelInference.generateText(prompt, 150);
           if (generatedText && generatedText.length > 10) {
+            // Store response in context
+            this.context.setLastResponse(generatedText);
             return { 
               text: generatedText,
               shouldSpeak: true
@@ -223,6 +275,9 @@ class ResponseGenerator {
         responseText = responses.fallback[Math.floor(Math.random() * responses.fallback.length)];
       }
     }
+    
+    // Store response in context
+    this.context.setLastResponse(responseText);
     
     return { 
       text: responseText,
