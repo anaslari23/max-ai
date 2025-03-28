@@ -1,7 +1,7 @@
-
 /**
  * Enhanced response generator for Max AI Assistant
  */
+import modelInference from './ModelInference';
 
 interface ResponseData {
   text: string;
@@ -86,7 +86,6 @@ const responses = {
   ]
 };
 
-// Enhanced pattern matching for determining response types
 const patterns = {
   greeting: /\b(hi|hello|hey|greetings|good morning|good afternoon|good evening)\b/i,
   farewell: /\b(bye|goodbye|see you|farewell|exit|quit)\b/i,
@@ -103,7 +102,6 @@ const patterns = {
   calculation: /\b(calculate|compute|what is|how much is|solve|math|plus|minus|times|divided by)\b/i
 };
 
-// Simple calculation regex
 const calculationRegex = {
   add: /(\d+)\s*(plus|\+)\s*(\d+)/i,
   subtract: /(\d+)\s*(minus|\-)\s*(\d+)/i,
@@ -111,7 +109,6 @@ const calculationRegex = {
   divide: /(\d+)\s*(divided by|\/)\s*(\d+)/i
 };
 
-// Context tracking for more natural conversations
 class ConversationContext {
   private topics: string[] = [];
   private lastTopic: string = '';
@@ -142,6 +139,7 @@ class ConversationContext {
 
 class ResponseGenerator {
   private static context = new ConversationContext();
+  private static useModelInference = true; // Toggle to use model inference
   
   static async getResponse(input: string): Promise<ResponseData> {
     // Normalize input
@@ -174,7 +172,43 @@ class ResponseGenerator {
       }
     }
     
-    // Get response based on category
+    // Try to use model inference for generating responses if it's a fallback
+    // or for certain categories that benefit from more natural responses
+    try {
+      if (this.useModelInference && 
+          (category === 'fallback' || 
+           category === 'capabilities' || 
+           category === 'identity')) {
+        console.log('Using model inference for response generation');
+        
+        // Add some context to the prompt for better responses
+        let prompt = `You are Max, an advanced AI assistant. The user says: "${input}". `;
+        
+        if (category === 'capabilities') {
+          prompt += 'Explain what you can do as an AI assistant in a friendly, conversational way.';
+        } else if (category === 'identity') {
+          prompt += 'Explain who you are in a friendly, conversational way.';
+        } else {
+          prompt += 'Respond in a helpful, friendly, and conversational way.';
+        }
+        
+        try {
+          const generatedText = await modelInference.generateText(prompt, 150);
+          if (generatedText && generatedText.length > 10) {
+            return { 
+              text: generatedText,
+              shouldSpeak: true
+            };
+          }
+        } catch (error) {
+          console.error('Error with model inference, falling back to template responses:', error);
+        }
+      }
+    } catch (error) {
+      console.error('Error in model inference path:', error);
+    }
+    
+    // Get response based on category (fallback if model inference failed or isn't used)
     let responseText: string;
     
     if (category === 'time') {
@@ -234,6 +268,10 @@ class ResponseGenerator {
   
   static clearContext() {
     this.context.clear();
+  }
+  
+  static setUseModelInference(use: boolean) {
+    this.useModelInference = use;
   }
 }
 
