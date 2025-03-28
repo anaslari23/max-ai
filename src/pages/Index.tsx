@@ -1,8 +1,8 @@
 
-import JarvisCore from "@/components/JarvisCore";
+import MaxCore from "@/components/MaxCore";
 
 const Index = () => {
-  return <JarvisCore />;
+  return <MaxCore />;
 };
 
 export default Index;
