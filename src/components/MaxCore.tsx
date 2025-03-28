@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Mic, MicOff, Send, Brain, Zap, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -37,7 +36,7 @@ const MaxCore: React.FC = () => {
           description: "Max is listening...",
           duration: 3000,
         });
-        toggleListening();
+        startListening();
       }
     });
     
@@ -45,6 +44,7 @@ const MaxCore: React.FC = () => {
     setTimeout(() => {
       if (voiceRecognition.current) {
         voiceRecognition.current.start();
+        console.log("Voice recognition started");
         toast({
           title: "Voice Recognition Active",
           description: "Say 'Hey Max' to activate me",
@@ -82,6 +82,7 @@ const MaxCore: React.FC = () => {
   // Start listening for voice input
   const startListening = () => {
     setIsListening(true);
+    console.log("Starting to listen...");
     
     // Visual feedback
     toast({
@@ -92,27 +93,31 @@ const MaxCore: React.FC = () => {
     
     if (voiceRecognition.current) {
       voiceRecognition.current.onResult((text) => {
+        console.log("Received text:", text);
         // Filter out wake words from the transcript
         const cleanedText = text.replace(/hey max|wake up max|good morning max|hi max|hello max|max/gi, '').trim();
         if (cleanedText) {
+          console.log("Cleaned text:", cleanedText);
           setInput(cleanedText);
+          
+          // Automatically send the message after receiving voice input
+          handleSend(cleanedText);
+          stopListening();
         }
       });
       
       // Set a timeout to stop listening if no input is received
       setTimeout(() => {
-        if (isListening && input.trim() !== '') {
-          handleSend(input);
-          stopListening();
-        } else if (isListening) {
+        if (isListening) {
           stopListening();
         }
-      }, 5000);
+      }, 8000); // Extend listening time to 8 seconds
     }
   };
   
   // Stop listening for voice input
   const stopListening = () => {
+    console.log("Stopping listening");
     setIsListening(false);
     if (voiceRecognition.current) {
       // Reset the result handler
@@ -123,6 +128,8 @@ const MaxCore: React.FC = () => {
   // Process user input and generate response
   const handleSend = async (text = input) => {
     if (!text.trim()) return;
+    
+    console.log("Processing user input:", text);
     
     // Add user message
     const userMessage = { type: 'user' as const, content: text, timestamp: new Date() };
@@ -137,6 +144,7 @@ const MaxCore: React.FC = () => {
       // Generate AI response
       setTimeout(async () => {
         const response = await ResponseGenerator.getResponse(text);
+        console.log("Generated response:", response);
         setIsTyping(false);
         setIsProcessing(false);
         
@@ -146,6 +154,7 @@ const MaxCore: React.FC = () => {
         
         // Speak the response if needed
         if (response.shouldSpeak && speechSynthesis.current) {
+          console.log("Speaking response");
           setIsSpeaking(true);
           speechSynthesis.current.speak(response.text, () => {
             setIsSpeaking(false);

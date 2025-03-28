@@ -6,6 +6,7 @@ class VoiceRecognition {
   private onWakeCallback: (() => void) | null = null;
   private onResultCallback: ((text: string) => void) | null = null;
   private onEndCallback: (() => void) | null = null;
+  private lastTranscript: string = '';
   
   constructor() {
     if ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window) {
@@ -26,25 +27,38 @@ class VoiceRecognition {
     this.recognition.lang = 'en-US';
     
     this.recognition.onresult = (event) => {
-      const transcript = Array.from(event.results)
-        .map(result => result[0].transcript.toLowerCase().trim())
-        .join(' ');
+      let transcript = '';
       
-      // Check for wake words
-      if (this.checkForWakeWords(transcript)) {
-        if (this.onWakeCallback) {
-          this.onWakeCallback();
-        }
+      // Get the most recent result
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        transcript += event.results[i][0].transcript;
       }
       
-      // Pass the full transcript to callback if provided
-      if (this.onResultCallback) {
-        this.onResultCallback(transcript);
+      transcript = transcript.toLowerCase().trim();
+      console.log("Raw transcript:", transcript);
+      
+      if (transcript !== this.lastTranscript) {
+        this.lastTranscript = transcript;
+        
+        // Check for wake words
+        if (this.checkForWakeWords(transcript)) {
+          console.log("Wake word detected");
+          if (this.onWakeCallback) {
+            this.onWakeCallback();
+          }
+        }
+        
+        // Pass the full transcript to callback if provided
+        if (this.onResultCallback) {
+          this.onResultCallback(transcript);
+        }
       }
     };
     
     this.recognition.onend = () => {
+      console.log("Recognition session ended");
       if (this.isListening) {
+        console.log("Restarting recognition because isListening is true");
         this.recognition?.start();
       }
       
