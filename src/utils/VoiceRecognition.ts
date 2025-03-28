@@ -7,6 +7,8 @@ class VoiceRecognition {
   private onResultCallback: ((text: string) => void) | null = null;
   private onEndCallback: (() => void) | null = null;
   private lastTranscript: string = '';
+  private listenTimeout: NodeJS.Timeout | null = null;
+  private confidenceThreshold: number = 0.5; // Minimum confidence threshold
   
   constructor() {
     if ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window) {
@@ -25,33 +27,62 @@ class VoiceRecognition {
     this.recognition.continuous = true;
     this.recognition.interimResults = true;
     this.recognition.lang = 'en-US';
+    this.recognition.maxAlternatives = 3; // Get multiple alternatives to improve accuracy
     
     this.recognition.onresult = (event) => {
       let transcript = '';
+      let isFinal = false;
+      let confidence = 0;
       
       // Get the most recent result
       for (let i = event.resultIndex; i < event.results.length; i++) {
-        transcript += event.results[i][0].transcript;
+        const result = event.results[i];
+        isFinal = result.isFinal;
+        
+        // Use the alternative with highest confidence
+        const bestAlternative = Array.from(result).reduce((best, current) => {
+          return current.confidence > best.confidence ? current : best;
+        }, result[0]);
+        
+        confidence = bestAlternative.confidence;
+        transcript += bestAlternative.transcript;
       }
       
       transcript = transcript.toLowerCase().trim();
-      console.log("Raw transcript:", transcript);
+      console.log("Raw transcript:", transcript, "Confidence:", confidence);
       
-      if (transcript !== this.lastTranscript) {
-        this.lastTranscript = transcript;
-        
-        // Check for wake words
-        if (this.checkForWakeWords(transcript)) {
-          console.log("Wake word detected");
-          if (this.onWakeCallback) {
-            this.onWakeCallback();
+      // Only process with sufficient confidence
+      if (confidence >= this.confidenceThreshold) {
+        if (transcript !== this.lastTranscript) {
+          this.lastTranscript = transcript;
+          
+          // Check for wake words
+          if (this.checkForWakeWords(transcript)) {
+            console.log("Wake word detected with confidence:", confidence);
+            if (this.onWakeCallback) {
+              this.onWakeCallback();
+              
+              // Reset the timeout if we detect a wake word
+              if (this.listenTimeout) {
+                clearTimeout(this.listenTimeout);
+                this.listenTimeout = null;
+              }
+            }
+          }
+          
+          // Pass the full transcript to callback if provided
+          if (this.onResultCallback) {
+            this.onResultCallback(transcript);
           }
         }
-        
-        // Pass the full transcript to callback if provided
-        if (this.onResultCallback) {
-          this.onResultCallback(transcript);
-        }
+      } else {
+        console.log("Ignored low confidence transcript:", transcript, "Confidence:", confidence);
+      }
+      
+      // If this is a final result and we're actively listening, extend the timeout
+      if (isFinal && this.isListening && this.listenTimeout) {
+        clearTimeout(this.listenTimeout);
+        this.setListenTimeout(8000); // Reset timeout after each final result
       }
     };
     
@@ -69,12 +100,48 @@ class VoiceRecognition {
     
     this.recognition.onerror = (event) => {
       console.error('Speech recognition error:', event.error);
-      this.isListening = false;
+      // Only set isListening to false for fatal errors
+      if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+        this.isListening = false;
+      }
     };
   }
   
   private checkForWakeWords(transcript: string): boolean {
     return this.wakeWords.some(wake => transcript.includes(wake));
+  }
+  
+  private setListenTimeout(duration: number) {
+    if (this.listenTimeout) {
+      clearTimeout(this.listenTimeout);
+    }
+    
+    this.listenTimeout = setTimeout(() => {
+      console.log("Listen timeout reached, stopping listening");
+      this.stopListening();
+    }, duration);
+  }
+  
+  private stopListening() {
+    console.log("Stopping listening internally");
+    this.isListening = false;
+    if (this.recognition) {
+      this.recognition.onresult = null;
+      try {
+        this.recognition.stop();
+      } catch (e) {
+        console.log("Error stopping recognition:", e);
+      }
+    }
+    
+    if (this.listenTimeout) {
+      clearTimeout(this.listenTimeout);
+      this.listenTimeout = null;
+    }
+    
+    if (this.onEndCallback) {
+      this.onEndCallback();
+    }
   }
   
   public start() {
@@ -84,6 +151,7 @@ class VoiceRecognition {
     }
     
     this.isListening = true;
+    this.lastTranscript = '';
     try {
       this.recognition.start();
       console.log('Voice recognition started, listening for wake words...');
@@ -96,7 +164,15 @@ class VoiceRecognition {
     if (!this.recognition) return;
     
     this.isListening = false;
-    this.recognition.stop();
+    if (this.listenTimeout) {
+      clearTimeout(this.listenTimeout);
+      this.listenTimeout = null;
+    }
+    try {
+      this.recognition.stop();
+    } catch (e) {
+      console.log("Error stopping recognition:", e);
+    }
     console.log('Voice recognition stopped.');
   }
   
@@ -114,6 +190,13 @@ class VoiceRecognition {
   
   public isActive(): boolean {
     return this.isListening;
+  }
+  
+  // Method to set confidence threshold
+  public setConfidenceThreshold(threshold: number) {
+    if (threshold >= 0 && threshold <= 1) {
+      this.confidenceThreshold = threshold;
+    }
   }
 }
 

@@ -29,6 +29,10 @@ const MaxCore: React.FC = () => {
     voiceRecognition.current = new VoiceRecognition();
     speechSynthesis.current = new SpeechSynthesis();
     
+    if (voiceRecognition.current) {
+      voiceRecognition.current.setConfidenceThreshold(0.4);
+    }
+    
     voiceRecognition.current.onWake(() => {
       if (!isListening && !isProcessing) {
         toast({
@@ -89,13 +93,15 @@ const MaxCore: React.FC = () => {
     if (voiceRecognition.current) {
       voiceRecognition.current.onResult((text) => {
         console.log("Received text:", text);
-        const cleanedText = text.replace(/hey max|wake up max|good morning max|hi max|hello max|max/gi, '').trim();
-        if (cleanedText) {
-          console.log("Cleaned text:", cleanedText);
-          setInput(cleanedText);
-          
-          handleSend(cleanedText);
-          stopListening();
+        if (text && text.length > 2) {
+          const cleanedText = text.replace(/hey max|wake up max|good morning max|hi max|hello max|max/gi, '').trim();
+          if (cleanedText) {
+            console.log("Cleaned text:", cleanedText);
+            setInput(cleanedText);
+            
+            handleSend(cleanedText);
+            stopListening();
+          }
         }
       });
       
@@ -103,7 +109,7 @@ const MaxCore: React.FC = () => {
         if (isListening) {
           stopListening();
         }
-      }, 8000);
+      }, 12000);
     }
   };
 
