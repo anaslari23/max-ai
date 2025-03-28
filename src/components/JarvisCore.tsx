@@ -58,8 +58,12 @@ const JarvisCore: React.FC = () => {
         setIsTyping(false);
         setIsProcessing(false);
         
-        // Add JARVIS response
-        const jarvisMessage = { type: 'jarvis' as const, content: response, timestamp: new Date() };
+        // Add JARVIS response, making sure to extract the text property from ResponseData
+        const jarvisMessage = { 
+          type: 'jarvis' as const, 
+          content: response.text, 
+          timestamp: new Date() 
+        };
         setMessages(prev => [...prev, jarvisMessage]);
       }, 1500);
     } catch (error) {

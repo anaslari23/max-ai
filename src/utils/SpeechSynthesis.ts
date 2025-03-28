@@ -1,6 +1,6 @@
 
 class SpeechSynthesis {
-  private synthesis: SpeechSynthesis;
+  private synthesis: Window['speechSynthesis'];
   private voices: SpeechSynthesisVoice[] = [];
   private preferredVoice: SpeechSynthesisVoice | null = null;
   
@@ -75,11 +75,11 @@ class SpeechSynthesis {
   }
   
   public isPaused(): boolean {
-    return this.synthesis.paused;
+    return this.synthesis ? this.synthesis.paused : false;
   }
   
   public isSpeaking(): boolean {
-    return this.synthesis.speaking;
+    return this.synthesis ? this.synthesis.speaking : false;
   }
 }
 
