@@ -75,9 +75,12 @@ class ModelInference {
         try {
           // Load the model using transformers.js pipeline
           // Use proper typing and check if the model has the quantized property
-          const options = 'quantized' in modelConfig ? 
-            { quantized: modelConfig.quantized } : 
-            {};
+          // The @huggingface/transformers package expects quantized property in the options
+          const options: Record<string, any> = {};
+          
+          if ('quantized' in modelConfig) {
+            options.quantized = modelConfig.quantized;
+          }
           
           const model = await pipeline(
             modelConfig.task,
