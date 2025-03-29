@@ -2,7 +2,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Mic, MicOff, Send, Brain, Settings, Info, MessageCircle, Zap, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Tooltip } from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
 import AudioVisualizer from './AudioVisualizer';
 import ResponseGenerator from '../utils/ResponseGenerator';
@@ -30,55 +29,106 @@ const MaxCore: React.FC = () => {
   const voiceRecognition = useRef<VoiceRecognition | null>(null);
   const speechSynthesis = useRef<SpeechSynthesis | null>(null);
   const { toast } = useToast();
+  
+  // AI model status tracking
+  const [aiModelsStatus, setAiModelsStatus] = useState<Record<string, 'not_loaded' | 'loading' | 'ready' | 'error'>>({});
+  const [useAiModels, setUseAiModels] = useState(true);
+
+  // Initialize components and set up event listeners
+  useEffect(() => {
+    // Enable AI features by default
+    ResponseGenerator.setUseModelInference(useAiModels);
+    
+    // Preload AI models in the background
+    if (useAiModels) {
+      const loadModels = async () => {
+        try {
+          // Start with text generation model
+          await modelInference.preloadModel('textGeneration');
+          // Update models status in UI
+          setAiModelsStatus(modelInference.getModelStatus());
+        } catch (e) {
+          console.error("Error preloading models:", e);
+        }
+      };
+      
+      loadModels();
+      
+      // Set up periodic status check
+      const statusInterval = setInterval(() => {
+        setAiModelsStatus(modelInference.getModelStatus());
+      }, 5000);
+      
+      return () => clearInterval(statusInterval);
+    }
+  }, [useAiModels]);
 
   useEffect(() => {
     voiceRecognition.current = new VoiceRecognition();
     speechSynthesis.current = new SpeechSynthesis();
     
     if (voiceRecognition.current) {
-      voiceRecognition.current.setConfidenceThreshold(0.3);
+      // Set more permissive settings for better wake word detection
+      voiceRecognition.current.setConfidenceThreshold(0.25);
       voiceRecognition.current.setMaxConsecutiveLowConfidence(3);
+      voiceRecognition.current.setDebugMode(true);
     }
     
-    voiceRecognition.current.onWake(() => {
-      if (!isListening && !isProcessing) {
-        // Expand the bubble when wake word is detected
-        setShowFullInterface(true);
+    // Set up wake word detection
+    if (voiceRecognition.current) {
+      voiceRecognition.current.onWake(() => {
+        console.log("WAKE WORD DETECTED, ACTIVATING MAX");
         
-        const wakeResponse = ResponseGenerator.getWakeUpResponse();
-        setMessages(prev => [...prev, { 
-          type: 'max', 
-          content: wakeResponse, 
-          timestamp: new Date() 
-        }]);
-        
-        if (speechSynthesis.current) {
-          setIsSpeaking(true);
-          speechSynthesis.current.speak(wakeResponse, () => {
-            setIsSpeaking(false);
+        if (!isListening && !isProcessing) {
+          // Expand the bubble when wake word is detected
+          setShowFullInterface(true);
+          
+          const wakeResponse = ResponseGenerator.getWakeUpResponse();
+          setMessages(prev => [...prev, { 
+            type: 'max', 
+            content: wakeResponse, 
+            timestamp: new Date() 
+          }]);
+          
+          if (speechSynthesis.current) {
+            setIsSpeaking(true);
+            speechSynthesis.current.speak(wakeResponse, () => {
+              setIsSpeaking(false);
+              startListening();
+            });
+          } else {
             startListening();
+          }
+          
+          toast({
+            title: "Hey there!",
+            description: "Max is listening...",
+            duration: 3000,
           });
-        } else {
-          startListening();
         }
-        
-        toast({
-          title: "Hey there!",
-          description: "Max is listening...",
-          duration: 3000,
-        });
-      }
-    });
+      });
+    }
     
+    // Start voice recognition immediately
     setTimeout(() => {
       if (voiceRecognition.current) {
-        voiceRecognition.current.start();
-        console.log("Voice recognition started");
-        toast({
-          title: "Voice Recognition Active",
-          description: "Say 'Hey Max' to activate me",
-          duration: 5000,
-        });
+        try {
+          voiceRecognition.current.start();
+          console.log("Voice recognition started and listening for wake words");
+          toast({
+            title: "Voice Recognition Active",
+            description: "Say 'Hey Max' to activate me",
+            duration: 5000,
+          });
+        } catch (e) {
+          console.error("Failed to start voice recognition:", e);
+          toast({
+            title: "Voice Recognition Failed",
+            description: "Please check microphone permissions",
+            variant: "destructive",
+            duration: 5000,
+          });
+        }
       }
     }, 1000);
     
@@ -126,12 +176,14 @@ const MaxCore: React.FC = () => {
     };
   }, []);
 
+  // Scroll to bottom of messages when new ones are added
   useEffect(() => {
     if (messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages]);
 
+  // Animate bubble based on state
   useEffect(() => {
     // Animate bubble size based on speech/listening status
     if (isListening) {
@@ -169,13 +221,13 @@ const MaxCore: React.FC = () => {
     
     if (voiceRecognition.current) {
       voiceRecognition.current.onResult((text) => {
-        console.log("Received text:", text);
+        console.log("Received user speech:", text);
         if (text && text.length > 2) {
           const wakeWordPattern = /\b(hey max|wake up max|good morning max|hi max|hello max|max)\b/gi;
           const cleanedText = text.replace(wakeWordPattern, '').trim();
           
           if (cleanedText && cleanedText.length > 2) {
-            console.log("Cleaned text:", cleanedText);
+            console.log("Processing user text:", cleanedText);
             setInput(cleanedText);
             
             setTimeout(() => {
@@ -223,65 +275,69 @@ const MaxCore: React.FC = () => {
     
     setIsTyping(true);
     
-    try {
-      if (text.toLowerCase().includes('use model') || text.toLowerCase().includes('advanced mode')) {
-        setIsModelLoading(true);
-        toast({
-          title: "Loading AI Models",
-          description: "This might take a moment as I download the needed models...",
-          duration: 5000,
-        });
-        
-        try {
-          await modelInference.generateText("Hello", 5);
-          ResponseGenerator.setUseModelInference(true);
-          setIsModelLoading(false);
-          
-          setIsTyping(false);
-          setIsProcessing(false);
-          
-          const maxMessage = { 
-            type: 'max' as const, 
-            content: "I've activated my advanced AI models! I can now provide more natural and detailed responses to your questions.", 
-            timestamp: new Date() 
-          };
-          setMessages(prev => [...prev, maxMessage]);
-          
-          if (speechSynthesis.current) {
-            setIsSpeaking(true);
-            speechSynthesis.current.speak(maxMessage.content, () => {
-              setIsSpeaking(false);
-            });
-          }
-          
-          return;
-        } catch (error) {
-          console.error("Error loading models:", error);
-          setModelError("Couldn't load advanced AI models");
-          setIsModelLoading(false);
-          
-          const maxMessage = { 
-            type: 'max' as const, 
-            content: "I tried to activate my advanced models, but encountered an error. I'll continue using my standard response system.", 
-            timestamp: new Date() 
-          };
-          
-          setIsTyping(false);
-          setIsProcessing(false);
-          setMessages(prev => [...prev, maxMessage]);
-          
-          if (speechSynthesis.current) {
-            setIsSpeaking(true);
-            speechSynthesis.current.speak(maxMessage.content, () => {
-              setIsSpeaking(false);
-            });
-          }
-          
-          return;
-        }
-      }
+    // Handle commands to enable/disable AI features
+    if (text.toLowerCase().includes('use ai') || text.toLowerCase().includes('advanced mode')) {
+      setIsModelLoading(true);
+      toast({
+        title: "Loading AI Models",
+        description: "This might take a moment as I download the needed models...",
+        duration: 5000,
+      });
       
-      setTimeout(async () => {
+      try {
+        // Try to load the text generation model
+        await modelInference.preloadModel('textGeneration');
+        setUseAiModels(true);
+        ResponseGenerator.setUseModelInference(true);
+        setIsModelLoading(false);
+        
+        setIsTyping(false);
+        setIsProcessing(false);
+        
+        const maxMessage = { 
+          type: 'max' as const, 
+          content: "I've activated my advanced AI models! I can now provide more natural and detailed responses to your questions.", 
+          timestamp: new Date() 
+        };
+        setMessages(prev => [...prev, maxMessage]);
+        
+        if (speechSynthesis.current) {
+          setIsSpeaking(true);
+          speechSynthesis.current.speak(maxMessage.content, () => {
+            setIsSpeaking(false);
+          });
+        }
+        
+        return;
+      } catch (error) {
+        console.error("Error loading AI models:", error);
+        setModelError("Couldn't load advanced AI models");
+        setIsModelLoading(false);
+        
+        const errorMessage = { 
+          type: 'max' as const, 
+          content: "I tried to activate my advanced models, but encountered an error. I'll continue using my standard response system.", 
+          timestamp: new Date() 
+        };
+        
+        setIsTyping(false);
+        setIsProcessing(false);
+        setMessages(prev => [...prev, errorMessage]);
+        
+        if (speechSynthesis.current) {
+          setIsSpeaking(true);
+          speechSynthesis.current.speak(errorMessage.content, () => {
+            setIsSpeaking(false);
+          });
+        }
+        
+        return;
+      }
+    }
+    
+    // Generate AI response with a slight typing delay for realism
+    setTimeout(async () => {
+      try {
         const response = await ResponseGenerator.getResponse(text);
         console.log("Generated response:", response);
         setIsTyping(false);
@@ -300,19 +356,26 @@ const MaxCore: React.FC = () => {
             setIsSpeaking(false);
           });
         }
-      }, 800);
-    } catch (error) {
-      console.error('Error generating response:', error);
-      setIsTyping(false);
-      setIsProcessing(false);
-      
-      const errorMessage = { 
-        type: 'max' as const, 
-        content: 'I apologize, but I encountered an error processing your request.', 
-        timestamp: new Date() 
-      };
-      setMessages(prev => [...prev, errorMessage]);
-    }
+      } catch (error) {
+        console.error('Error generating response:', error);
+        setIsTyping(false);
+        setIsProcessing(false);
+        
+        const errorMessage = { 
+          type: 'max' as const, 
+          content: 'I apologize, but I encountered an error processing your request.', 
+          timestamp: new Date() 
+        };
+        setMessages(prev => [...prev, errorMessage]);
+        
+        if (speechSynthesis.current) {
+          setIsSpeaking(true);
+          speechSynthesis.current.speak(errorMessage.content, () => {
+            setIsSpeaking(false);
+          });
+        }
+      }
+    }, 800);
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -341,13 +404,25 @@ const MaxCore: React.FC = () => {
         responseText = randomConversation.getConversationStarter();
         break;
       case 'zap':
-        responseText = "My advanced features are ready to help you. Ask me about weather, directions, calculations, or just chat!";
+        if (useAiModels) {
+          const modelInfo = modelInference.getAvailableModels();
+          const readyModels = Object.entries(modelInfo)
+            .filter(([_, info]) => info.status === 'ready')
+            .map(([name, _]) => name)
+            .join(', ');
+          
+          responseText = readyModels.length > 0 
+            ? `My AI features are active. Currently loaded models: ${readyModels}`
+            : "My AI features are enabled but no models are loaded yet. Ask me a question to activate them!";
+        } else {
+          responseText = "My advanced AI features are available. Say 'use AI' to activate them for more natural conversations.";
+        }
         break;
       case 'info':
-        responseText = "I'm Max, your AI assistant. I can help with information, directions, weather, calculations and more. Just ask!";
+        responseText = "I'm Max, an AI assistant built with advanced voice recognition and natural language processing. I can help with information, conversations, and more.";
         break;
       case 'settings':
-        responseText = "If this were a full implementation, you could customize my voice, appearance, and behavior here.";
+        responseText = "My settings include voice recognition, AI features, and conversation memory. Currently running with AI " + (useAiModels ? "enabled" : "disabled") + ".";
         break;
       default:
         return;

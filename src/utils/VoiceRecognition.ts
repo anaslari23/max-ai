@@ -13,6 +13,7 @@ class VoiceRecognition {
   private maxConsecutiveLowConfidence: number = 3;
   private noiseFilter: RegExp = /^(\s|um|uh|ah|er|like|so|yeah|just|you know)+$/i;
   private lastWakeWordTime: number = 0;
+  private debugMode: boolean = true; // Enable debug mode to see what's happening
   
   constructor() {
     if ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window) {
@@ -58,11 +59,15 @@ class VoiceRecognition {
       transcript = bestTranscript;
       confidence = bestConfidence;
       
-      console.log("Raw transcript:", transcript, "Confidence:", confidence);
+      if (this.debugMode) {
+        console.log("Raw transcript:", transcript, "Confidence:", confidence);
+      }
       
       // Skip processing for noise or very short inputs
       if (this.noiseFilter.test(transcript) || transcript.length < 2) {
-        console.log("Filtered out noise or very short input");
+        if (this.debugMode) {
+          console.log("Filtered out noise or very short input");
+        }
         return;
       }
       
@@ -71,7 +76,7 @@ class VoiceRecognition {
         const currentTime = Date.now();
         // Prevent multiple wake word detections within 3 seconds
         if (currentTime - this.lastWakeWordTime > 3000) {
-          console.log("Wake word detected with confidence:", confidence);
+          console.log("⭐ WAKE WORD DETECTED ⭐:", transcript, "Confidence:", confidence);
           this.lastWakeWordTime = currentTime;
           if (this.onWakeCallback) {
             this.onWakeCallback();
@@ -102,8 +107,10 @@ class VoiceRecognition {
         }
       } else {
         this.consecutiveLowConfidence++;
-        console.log("Low confidence transcript:", transcript, "Confidence:", confidence, 
+        if (this.debugMode) {
+          console.log("Low confidence transcript:", transcript, "Confidence:", confidence, 
                     "Count:", this.consecutiveLowConfidence);
+        }
         
         // If we've had several consecutive low confidence results, try to use the best one anyway
         if (this.consecutiveLowConfidence >= this.maxConsecutiveLowConfidence && transcript.length > 5) {
@@ -168,6 +175,7 @@ class VoiceRecognition {
   }
   
   private checkForWakeWords(transcript: string): boolean {
+    // More aggressive wake word detection: check if any wake word is included anywhere
     for (const wake of this.wakeWords) {
       if (transcript.includes(wake)) {
         return true;
@@ -261,6 +269,10 @@ class VoiceRecognition {
     if (threshold >= 0 && threshold <= 1) {
       this.confidenceThreshold = threshold;
     }
+  }
+  
+  public setDebugMode(enable: boolean) {
+    this.debugMode = enable;
   }
   
   public setMaxConsecutiveLowConfidence(max: number) {
