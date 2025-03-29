@@ -1,7 +1,10 @@
+
 /**
  * Enhanced response generator for Max AI Assistant
  */
 import modelInference from './ModelInference';
+import weatherService from './WeatherService';
+import directionsService from './DirectionsService';
 
 interface ResponseData {
   text: string;
@@ -22,7 +25,7 @@ const responses = {
   ],
   
   capabilities: [
-    "I'm Max, your advanced AI assistant designed to help with various tasks. I can:\n\n- Process natural language commands\n- Recognize speech and respond verbally\n- Answer questions on many topics\n- Remember our conversation context\n- Perform basic calculations\n- Tell jokes and fun facts\n\nI'm constantly learning and improving to serve you better."
+    "I'm Max, your advanced AI assistant designed to help with various tasks. I can:\n\n- Process natural language commands\n- Recognize speech and respond verbally\n- Answer questions on many topics\n- Check the weather and get directions\n- Tell you the time and date\n- Perform calculations\n- Tell jokes and fun facts\n- Set reminders and alarms\n\nJust ask and I'll do my best to help you!"
   ],
   
   identity: [
@@ -31,7 +34,7 @@ const responses = {
   ],
   
   weather: [
-    "I'd be happy to check the weather for you. In a full implementation, I would connect to weather APIs to provide accurate forecasts."
+    "I'd be happy to check the weather for you. What location would you like the weather for?"
   ],
   
   time: [
@@ -49,7 +52,10 @@ const responses = {
     "How does a computer get drunk? It takes screenshots.",
     "What did the ocean say to the beach? Nothing, it just waved.",
     "Why don't eggs tell jokes? They'd crack each other up.",
-    "I told my wife she was drawing her eyebrows too high. She looked surprised."
+    "I told my wife she was drawing her eyebrows too high. She looked surprised.",
+    "Why did the bicycle fall over? Because it was two tired.",
+    "Why couldn't the leopard play hide and seek? Because he was always spotted.",
+    "What's orange and sounds like a parrot? A carrot."
   ],
   
   music: [
@@ -62,8 +68,12 @@ const responses = {
   ],
   
   reminder: [
-    "I'd be happy to set a reminder for you. In a full implementation, I would access your calendar and create a reminder.",
+    "I'd be happy to set a reminder for you. What would you like me to remind you about, and when?",
     "I'll remember that for you. Is there a specific time you'd like to be reminded?"
+  ],
+  
+  directions: [
+    "I can help you with directions. Where are you starting from and where would you like to go?"
   ],
   
   calculation: {
@@ -79,6 +89,15 @@ const responses = {
     "My pleasure! What else can I assist you with today?"
   ],
   
+  facts: [
+    "The Great Wall of China is not visible from space with the naked eye, contrary to popular belief.",
+    "Honey never spoils. Archaeologists have found pots of honey in ancient Egyptian tombs that are over 3,000 years old and still perfectly good to eat.",
+    "A day on Venus is longer than a year on Venus. It takes 243 Earth days to rotate once on its axis, but only 225 Earth days to orbit the Sun.",
+    "Octopuses have three hearts, nine brains, and blue blood.",
+    "The longest word in the English language without a vowel is 'rhythms'.",
+    "Bananas are berries, but strawberries aren't."
+  ],
+  
   fallback: [
     "I'm still improving my understanding of different topics. Could you rephrase that?",
     "I'm not sure I understand completely. Could you provide more details?",
@@ -91,15 +110,17 @@ const patterns = {
   farewell: /\b(bye|goodbye|see you|farewell|exit|quit)\b/i,
   capabilities: /\b(what can you do|capabilities|features|functions|abilities|help me|how do you work)\b/i,
   identity: /\b(who are you|what are you|tell me about yourself|your name|what is max)\b/i,
-  weather: /\b(weather|temperature|forecast|rain|snow|sunny|cloudy)\b/i,
+  weather: /\b(weather|temperature|forecast|rain|snow|sunny|cloudy|humidity|wind)\b/i,
   time: /\b(time|what time is it|current time|clock|hour)\b/i,
-  date: /\b(date|what day is it|today|what is today|day of the week)\b/i,
+  date: /\b(date|what day is it|today|what is today|day of the week|calendar)\b/i,
   joke: /\b(joke|funny|make me laugh|tell me something funny)\b/i,
   music: /\b(play music|play song|music|song|playlist|artist)\b/i,
   mobile: /\b(mobile|phone|call|text|sms|app integration)\b/i,
   reminder: /\b(remind me|reminder|don't forget|remember to|set reminder|set alarm)\b/i,
   thanks: /\b(thanks|thank you|appreciate it|grateful)\b/i,
-  calculation: /\b(calculate|compute|what is|how much is|solve|math|plus|minus|times|divided by)\b/i
+  calculation: /\b(calculate|compute|what is|how much is|solve|math|plus|minus|times|divided by)\b/i,
+  directions: /\b(directions|navigate|how (do|can) I get to|route to|way to|map|distance|how far)\b/i,
+  facts: /\b(tell me a fact|random fact|did you know|fun fact|interesting fact)\b/i
 };
 
 const calculationRegex = {
@@ -109,12 +130,17 @@ const calculationRegex = {
   divide: /(\d+)\s*(divided by|\/)\s*(\d+)/i
 };
 
+// Specific patterns for extracting entities from weather and directions queries
+const weatherLocationPattern = /weather (?:in|at|for) ([a-zA-Z\s]+)/i;
+const directionsPattern = /(?:directions|navigate|route) (?:from|to) ([a-zA-Z\s]+) (?:to|from) ([a-zA-Z\s]+)/i;
+
 class ConversationContext {
   private topics: string[] = [];
   private lastTopic: string = '';
   private lastInput: string = '';
   private lastResponse: string = '';
   private consecutiveFallbacks: number = 0;
+  private entityMemory: Map<string, string> = new Map();
   
   public addTopic(topic: string) {
     this.lastTopic = topic;
@@ -162,12 +188,21 @@ class ConversationContext {
     return this.consecutiveFallbacks;
   }
   
+  public setEntity(type: string, value: string) {
+    this.entityMemory.set(type, value);
+  }
+  
+  public getEntity(type: string): string | undefined {
+    return this.entityMemory.get(type);
+  }
+  
   public clear() {
     this.topics = [];
     this.lastTopic = '';
     this.lastInput = '';
     this.lastResponse = '';
     this.consecutiveFallbacks = 0;
+    this.entityMemory.clear();
   }
 }
 
@@ -187,6 +222,42 @@ class ResponseGenerator {
     if (calculationResult) {
       this.context.resetFallbacks();
       return { text: calculationResult, shouldSpeak: true };
+    }
+    
+    // Check for specific weather queries with location
+    const weatherMatch = normalizedInput.match(weatherLocationPattern);
+    if (weatherMatch && weatherMatch[1]) {
+      try {
+        const location = weatherMatch[1].trim();
+        this.context.setEntity('weatherLocation', location);
+        const weatherData = await weatherService.getWeather(location);
+        const response = weatherService.generateWeatherResponse(weatherData);
+        this.context.setLastResponse(response);
+        this.context.resetFallbacks();
+        return { text: response, shouldSpeak: true };
+      } catch (error) {
+        console.error("Weather error:", error);
+        return { text: "I couldn't get the weather information right now. Please try again later.", shouldSpeak: true };
+      }
+    }
+    
+    // Check for directions queries
+    const directionsMatch = normalizedInput.match(directionsPattern);
+    if (directionsMatch && directionsMatch[1] && directionsMatch[2]) {
+      try {
+        const from = directionsMatch[1].trim();
+        const to = directionsMatch[2].trim();
+        this.context.setEntity('directionsFrom', from);
+        this.context.setEntity('directionsTo', to);
+        const directionsData = await directionsService.getDirections(from, to);
+        const response = directionsService.generateDirectionsResponse(directionsData);
+        this.context.setLastResponse(response);
+        this.context.resetFallbacks();
+        return { text: response, shouldSpeak: true };
+      } catch (error) {
+        console.error("Directions error:", error);
+        return { text: "I couldn't get the directions right now. Please try again later.", shouldSpeak: true };
+      }
     }
     
     // Determine response category based on input
@@ -211,6 +282,22 @@ class ResponseGenerator {
         category = 'fallback';
         this.context.incrementFallbacks();
       }
+    }
+    
+    // Handle time requests with updated time
+    if (category === 'time') {
+      const now = new Date();
+      const timeResponse = `The current time is ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.`;
+      this.context.setLastResponse(timeResponse);
+      return { text: timeResponse, shouldSpeak: true };
+    }
+    
+    // Handle date requests with updated date
+    if (category === 'date') {
+      const now = new Date();
+      const dateResponse = `Today is ${now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}.`;
+      this.context.setLastResponse(dateResponse);
+      return { text: dateResponse, shouldSpeak: true };
     }
     
     // If we have multiple consecutive fallbacks, try to use model inference for better responses
@@ -263,17 +350,16 @@ class ResponseGenerator {
     // Get response based on category (fallback if model inference failed or isn't used)
     let responseText: string;
     
-    if (category === 'time') {
-      responseText = `The current time is ${new Date().toLocaleTimeString()}.`;
-    } else if (category === 'date') {
-      responseText = `Today is ${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}.`;
-    } else {
+    // For certain categories, generate a random response from the array
+    if (category && responses[category as keyof typeof responses]) {
       const possibleResponses = responses[category as keyof typeof responses];
       if (Array.isArray(possibleResponses)) {
         responseText = possibleResponses[Math.floor(Math.random() * possibleResponses.length)];
       } else {
         responseText = responses.fallback[Math.floor(Math.random() * responses.fallback.length)];
       }
+    } else {
+      responseText = responses.fallback[Math.floor(Math.random() * responses.fallback.length)];
     }
     
     // Store response in context

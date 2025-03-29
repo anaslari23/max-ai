@@ -1,5 +1,6 @@
+
 import React, { useState, useEffect, useRef } from 'react';
-import { Mic, MicOff, Send, Brain, Zap, Settings } from 'lucide-react';
+import { Mic, MicOff, Send, Brain, Settings, Info, MessageCircle, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip } from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
@@ -31,7 +32,7 @@ const MaxCore: React.FC = () => {
     
     if (voiceRecognition.current) {
       voiceRecognition.current.setConfidenceThreshold(0.3);
-      voiceRecognition.current.setMaxConsecutiveLowConfidence(4);
+      voiceRecognition.current.setMaxConsecutiveLowConfidence(3);
     }
     
     voiceRecognition.current.onWake(() => {
@@ -221,7 +222,7 @@ const MaxCore: React.FC = () => {
             setIsSpeaking(false);
           });
         }
-      }, 1000);
+      }, 800);
     } catch (error) {
       console.error('Error generating response:', error);
       setIsTyping(false);
@@ -248,23 +249,33 @@ const MaxCore: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col h-screen bg-gradient-to-b from-blue-900 to-black">
-      <div className="w-full p-3 bg-black/40 backdrop-blur-md border-b border-blue-500/30 flex justify-between items-center">
+    <div className="flex flex-col h-screen bg-gradient-to-b from-purple-900 via-blue-900 to-black overflow-hidden">
+      {/* Animated background circles */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-1/4 left-1/4 w-80 h-80 rounded-full bg-purple-600 opacity-10 blur-3xl animate-pulse-slow"></div>
+        <div className="absolute bottom-1/3 right-1/3 w-96 h-96 rounded-full bg-blue-500 opacity-10 blur-3xl animate-pulse-slow"></div>
+        <div className="absolute top-2/3 left-1/2 w-64 h-64 rounded-full bg-cyan-400 opacity-10 blur-3xl animate-pulse-slow"></div>
+      </div>
+      
+      {/* Header bar */}
+      <div className="w-full p-3 bg-black/40 backdrop-blur-md border-b border-purple-500/30 flex justify-between items-center z-10">
         <div className="flex items-center space-x-2">
-          <div className={`h-3 w-3 rounded-full ${isSpeaking || isListening ? 'bg-green-500 animate-pulse' : 'bg-blue-500 animate-pulse-slow'}`} />
-          <span className="text-blue-400 font-semibold tracking-wider text-xs md:text-sm">
-            MAX {isModelLoading ? 'LOADING MODELS' : isSpeaking ? 'SPEAKING' : isListening ? 'LISTENING' : 'ACTIVE'}
+          <div className={`h-3 w-3 rounded-full ${isSpeaking || isListening ? 'bg-green-400 animate-pulse' : 'bg-purple-400 animate-pulse-slow'}`} />
+          <span className="text-purple-300 font-semibold tracking-wider text-xs md:text-sm">
+            MAX {isModelLoading ? 'LOADING MODELS' : isSpeaking ? 'SPEAKING' : isListening ? 'LISTENING' : 'READY'}
           </span>
         </div>
         <div className="flex items-center space-x-2">
-          <span className="text-xs text-blue-300">{new Date().toLocaleDateString()}</span>
-          <span className="text-xs text-blue-200">{new Date().toLocaleTimeString()}</span>
+          <span className="text-xs text-purple-200">{new Date().toLocaleDateString()}</span>
+          <span className="text-xs text-purple-100">{new Date().toLocaleTimeString()}</span>
         </div>
       </div>
 
+      {/* Main content area */}
       <div className="flex-1 overflow-hidden flex flex-col p-4">
-        <div className="glass rounded-lg p-4 mb-4 text-center">
-          <h1 className="text-2xl font-bold text-blue-400 glow-text mb-2">MAX</h1>
+        {/* AI assistant info card */}
+        <div className="backdrop-blur-lg bg-purple-500/10 rounded-2xl p-4 mb-4 text-center border border-purple-500/20 shadow-lg shadow-purple-500/10">
+          <h1 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-cyan-300 mb-2">MAX</h1>
           <p className="text-sm text-gray-300">Your Personal AI Assistant</p>
           <p className="text-xs text-gray-400 mt-2">
             Say "Hey Max" or use the microphone button to activate voice commands
@@ -281,6 +292,7 @@ const MaxCore: React.FC = () => {
           )}
         </div>
 
+        {/* Messages container */}
         <div className="flex-1 overflow-y-auto pr-2 mb-4 space-y-4">
           {messages.map((message, index) => (
             <div 
@@ -288,13 +300,13 @@ const MaxCore: React.FC = () => {
               className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
             >
               <div 
-                className={`max-w-[80%] md:max-w-[70%] rounded-lg p-3 ${
+                className={`max-w-[80%] md:max-w-[70%] rounded-2xl p-3 animate-fade-in ${
                   message.type === 'user' 
-                    ? 'bg-blue-600/20 text-white' 
-                    : 'glass text-blue-100'
+                    ? 'bg-gradient-to-br from-indigo-600/40 to-indigo-900/40 backdrop-blur-md text-white border border-indigo-400/20 shadow-lg shadow-indigo-500/10' 
+                    : 'bg-gradient-to-br from-purple-500/30 to-blue-600/30 backdrop-blur-md text-blue-100 border border-blue-400/20 shadow-lg shadow-blue-500/10'
                 }`}
               >
-                <div className={`text-xs mb-1 ${message.type === 'user' ? 'text-gray-300' : 'text-blue-400'}`}>
+                <div className={`text-xs mb-1 ${message.type === 'user' ? 'text-indigo-300' : 'text-purple-300'}`}>
                   {message.type === 'user' ? 'You' : 'MAX'} • {formatTime(message.timestamp)}
                 </div>
                 <div className="text-sm whitespace-pre-wrap">{message.content}</div>
@@ -304,8 +316,8 @@ const MaxCore: React.FC = () => {
           
           {isTyping && (
             <div className="flex justify-start">
-              <div className="glass rounded-lg p-3 max-w-[80%]">
-                <div className="text-xs mb-1 text-blue-400">
+              <div className="bg-gradient-to-br from-purple-500/30 to-blue-600/30 backdrop-blur-md rounded-2xl p-3 max-w-[80%] border border-blue-400/20 shadow-lg shadow-blue-500/10">
+                <div className="text-xs mb-1 text-purple-300">
                   MAX • {formatTime(new Date())}
                 </div>
                 <div className="typing-indicator">
@@ -320,16 +332,18 @@ const MaxCore: React.FC = () => {
           <div ref={messagesEndRef} />
         </div>
 
+        {/* Audio visualizer */}
         <div className="mb-4">
           <AudioVisualizer isActive={isListening || isProcessing || isTyping || isSpeaking} />
         </div>
 
+        {/* Input area */}
         <div className="relative">
           <div className="flex space-x-2">
             <Button 
               variant="outline" 
               size="icon" 
-              className={`${isListening ? 'bg-green-500 text-white' : 'bg-gray-800 text-blue-400'} rounded-full`}
+              className={`${isListening ? 'bg-green-500/80 text-white' : 'bg-purple-900/50 text-purple-300'} rounded-full border border-purple-400/30 shadow-md hover:bg-purple-700/50 transition-all duration-300`}
               onClick={toggleListening}
               disabled={isModelLoading}
             >
@@ -343,13 +357,13 @@ const MaxCore: React.FC = () => {
                 onChange={(e) => setInput(e.target.value)}
                 onKeyPress={handleKeyPress}
                 placeholder={isModelLoading ? "Loading AI models..." : "Type your message or use voice..."}
-                className="w-full p-3 pr-10 bg-gray-800/50 border border-blue-500/30 rounded-lg text-white focus:ring-2 focus:ring-blue-500/50 focus:outline-none"
+                className="w-full p-3 pr-10 bg-purple-900/20 backdrop-blur-md border border-purple-500/30 rounded-full text-white focus:ring-2 focus:ring-purple-500/50 focus:outline-none shadow-inner"
                 disabled={isProcessing || isModelLoading}
               />
               <Button 
                 variant="ghost" 
                 size="icon" 
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-blue-400 hover:text-blue-300 hover:bg-transparent"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-purple-300 hover:text-purple-100 hover:bg-transparent"
                 onClick={() => handleSend()}
                 disabled={!input.trim() || isProcessing || isModelLoading}
               >
@@ -360,19 +374,50 @@ const MaxCore: React.FC = () => {
         </div>
       </div>
 
-      <div className="w-full p-2 bg-black/40 backdrop-blur-md border-t border-blue-500/30 flex justify-center space-x-4">
+      {/* Footer with action buttons */}
+      <div className="w-full p-2 bg-black/40 backdrop-blur-md border-t border-purple-500/30 flex justify-center space-x-6">
         <Tooltip>
-          <Button variant="ghost" size="icon" className="text-blue-300">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="text-purple-300 hover:text-purple-100 hover:bg-purple-500/20 transition-all"
+          >
             <Brain size={20} />
           </Button>
         </Tooltip>
         <Tooltip>
-          <Button variant="ghost" size="icon" className="text-blue-200">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="text-blue-300 hover:text-blue-100 hover:bg-blue-500/20 transition-all"
+          >
+            <MessageCircle size={20} />
+          </Button>
+        </Tooltip>
+        <Tooltip>
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="text-cyan-300 hover:text-cyan-100 hover:bg-cyan-500/20 transition-all"
+          >
             <Zap size={20} />
           </Button>
         </Tooltip>
         <Tooltip>
-          <Button variant="ghost" size="icon" className="text-blue-400">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="text-indigo-300 hover:text-indigo-100 hover:bg-indigo-500/20 transition-all"
+          >
+            <Info size={20} />
+          </Button>
+        </Tooltip>
+        <Tooltip>
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="text-purple-400 hover:text-purple-200 hover:bg-purple-500/20 transition-all"
+          >
             <Settings size={20} />
           </Button>
         </Tooltip>

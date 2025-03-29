@@ -1,15 +1,17 @@
+
 class VoiceRecognition {
   private recognition: SpeechRecognition | null = null;
   private isListening: boolean = false;
-  private wakeWords: string[] = ['hey max', 'wake up max', 'good morning max', 'hi max', 'hello max', 'max'];
+  private wakeWords: string[] = ['hey max', 'wake up max', 'good morning max', 'hi max', 'hello max', 'max', 'okay max'];
   private onWakeCallback: (() => void) | null = null;
   private onResultCallback: ((text: string) => void) | null = null;
   private onEndCallback: (() => void) | null = null;
   private lastTranscript: string = '';
   private listenTimeout: NodeJS.Timeout | null = null;
-  private confidenceThreshold: number = 0.5; // Minimum confidence threshold
+  private confidenceThreshold: number = 0.4; // Lowered threshold for better recognition
   private consecutiveLowConfidence: number = 0;
   private maxConsecutiveLowConfidence: number = 3;
+  private noiseFilter: RegExp = /^(\s|um|uh|ah|er|like|so|yeah|just|you know)+$/i;
   
   constructor() {
     if ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window) {
@@ -57,8 +59,14 @@ class VoiceRecognition {
       
       console.log("Raw transcript:", transcript, "Confidence:", confidence);
       
+      // Skip processing for noise or very short inputs
+      if (this.noiseFilter.test(transcript) || transcript.length < 2) {
+        console.log("Filtered out noise or very short input");
+        return;
+      }
+      
       // Handle confidence thresholds with forgiveness mechanism
-      if (confidence >= this.confidenceThreshold) {
+      if (confidence >= this.confidenceThreshold || this.checkForWakeWords(transcript)) {
         this.consecutiveLowConfidence = 0; // Reset counter when we get good confidence
         
         if (transcript !== this.lastTranscript) {
@@ -110,7 +118,7 @@ class VoiceRecognition {
       // If this is a final result and we're actively listening, extend the timeout
       if (isFinal && this.isListening && this.listenTimeout) {
         clearTimeout(this.listenTimeout);
-        this.setListenTimeout(10000); // Increased timeout after each final result
+        this.setListenTimeout(12000); // Increased timeout after each final result
       }
     };
     
@@ -118,10 +126,19 @@ class VoiceRecognition {
       console.log("Recognition session ended");
       if (this.isListening) {
         console.log("Restarting recognition because isListening is true");
-        this.recognition?.start();
+        try {
+          this.recognition?.start();
+        } catch (e) {
+          console.error("Error restarting recognition:", e);
+          // If we can't restart, set isListening to false to avoid continuous restart attempts
+          this.isListening = false;
+          if (this.onEndCallback) {
+            this.onEndCallback();
+          }
+        }
       }
       
-      if (this.onEndCallback) {
+      if (this.onEndCallback && !this.isListening) {
         this.onEndCallback();
       }
     };
@@ -131,6 +148,20 @@ class VoiceRecognition {
       // Only set isListening to false for fatal errors
       if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
         this.isListening = false;
+        if (this.onEndCallback) {
+          this.onEndCallback();
+        }
+      } else if (event.error === 'network') {
+        // For network errors, attempt to restart after a delay
+        setTimeout(() => {
+          if (this.isListening) {
+            try {
+              this.recognition?.start();
+            } catch (e) {
+              console.error("Error restarting after network error:", e);
+            }
+          }
+        }, 2000);
       }
     };
   }
