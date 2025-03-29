@@ -9,6 +9,7 @@ import ResponseGenerator from '../utils/ResponseGenerator';
 import VoiceRecognition from '../utils/VoiceRecognition';
 import SpeechSynthesis from '../utils/SpeechSynthesis';
 import modelInference from '../utils/ModelInference';
+import randomConversation from '../utils/RandomConversation';
 
 const MaxCore: React.FC = () => {
   const [input, setInput] = useState('');
@@ -37,12 +38,28 @@ const MaxCore: React.FC = () => {
     
     voiceRecognition.current.onWake(() => {
       if (!isListening && !isProcessing) {
+        const wakeResponse = ResponseGenerator.getWakeUpResponse();
+        setMessages(prev => [...prev, { 
+          type: 'max', 
+          content: wakeResponse, 
+          timestamp: new Date() 
+        }]);
+        
+        if (speechSynthesis.current) {
+          setIsSpeaking(true);
+          speechSynthesis.current.speak(wakeResponse, () => {
+            setIsSpeaking(false);
+            startListening();
+          });
+        } else {
+          startListening();
+        }
+        
         toast({
           title: "Hey there!",
           description: "Max is listening...",
           duration: 3000,
         });
-        startListening();
       }
     });
     
@@ -58,6 +75,31 @@ const MaxCore: React.FC = () => {
       }
     }, 1000);
     
+    // Set a timer to occasionally initiate conversation if there's been a lull
+    const inactivityTimer = setInterval(() => {
+      const lastMessageTime = messages[messages.length - 1]?.timestamp || new Date(0);
+      const timeSinceLastMessage = new Date().getTime() - lastMessageTime.getTime();
+      
+      // If it's been more than 5 minutes since the last message and we're not in the middle of something
+      if (timeSinceLastMessage > 5 * 60 * 1000 && !isListening && !isProcessing && !isSpeaking) {
+        const randomFact = randomConversation.getRandomFact();
+        const factMessage = `Here's something interesting: ${randomFact}`;
+        
+        setMessages(prev => [...prev, { 
+          type: 'max', 
+          content: factMessage, 
+          timestamp: new Date() 
+        }]);
+        
+        if (speechSynthesis.current) {
+          setIsSpeaking(true);
+          speechSynthesis.current.speak(factMessage, () => {
+            setIsSpeaking(false);
+          });
+        }
+      }
+    }, 10 * 60 * 1000); // Check every 10 minutes
+    
     return () => {
       if (voiceRecognition.current) {
         voiceRecognition.current.stop();
@@ -65,6 +107,7 @@ const MaxCore: React.FC = () => {
       if (speechSynthesis.current) {
         speechSynthesis.current.cancel();
       }
+      clearInterval(inactivityTimer);
     };
   }, []);
 
@@ -124,7 +167,7 @@ const MaxCore: React.FC = () => {
         if (isListening) {
           stopListening();
         }
-      }, 15000);
+      }, 20000); // Extended to 20 seconds for better conversation
     }
   };
 
@@ -248,6 +291,41 @@ const MaxCore: React.FC = () => {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
+  // Add a new method to handle button clicks in the footer
+  const handleFooterButtonClick = (action: string) => {
+    let responseText = '';
+    
+    switch (action) {
+      case 'brain':
+        responseText = randomConversation.getRandomFact();
+        break;
+      case 'message':
+        responseText = randomConversation.getConversationStarter();
+        break;
+      case 'zap':
+        responseText = "My advanced features are ready to help you. Ask me about weather, directions, calculations, or just chat!";
+        break;
+      case 'info':
+        responseText = "I'm Max, your AI assistant. I can help with information, directions, weather, calculations and more. Just ask!";
+        break;
+      case 'settings':
+        responseText = "If this were a full implementation, you could customize my voice, appearance, and behavior here.";
+        break;
+      default:
+        return;
+    }
+    
+    const maxMessage = { type: 'max' as const, content: responseText, timestamp: new Date() };
+    setMessages(prev => [...prev, maxMessage]);
+    
+    if (speechSynthesis.current) {
+      setIsSpeaking(true);
+      speechSynthesis.current.speak(responseText, () => {
+        setIsSpeaking(false);
+      });
+    }
+  };
+
   return (
     <div className="flex flex-col h-screen bg-gradient-to-b from-purple-900 via-blue-900 to-black overflow-hidden">
       {/* Animated background circles */}
@@ -343,7 +421,7 @@ const MaxCore: React.FC = () => {
             <Button 
               variant="outline" 
               size="icon" 
-              className={`${isListening ? 'bg-green-500/80 text-white' : 'bg-purple-900/50 text-purple-300'} rounded-full border border-purple-400/30 shadow-md hover:bg-purple-700/50 transition-all duration-300`}
+              className={`${isListening ? 'bg-green-500/80 text-white animate-pulse' : 'bg-purple-900/50 text-purple-300'} rounded-full border border-purple-400/30 shadow-md hover:bg-purple-700/50 transition-all duration-300`}
               onClick={toggleListening}
               disabled={isModelLoading}
             >
@@ -381,6 +459,7 @@ const MaxCore: React.FC = () => {
             variant="ghost" 
             size="icon" 
             className="text-purple-300 hover:text-purple-100 hover:bg-purple-500/20 transition-all"
+            onClick={() => handleFooterButtonClick('brain')}
           >
             <Brain size={20} />
           </Button>
@@ -390,6 +469,7 @@ const MaxCore: React.FC = () => {
             variant="ghost" 
             size="icon" 
             className="text-blue-300 hover:text-blue-100 hover:bg-blue-500/20 transition-all"
+            onClick={() => handleFooterButtonClick('message')}
           >
             <MessageCircle size={20} />
           </Button>
@@ -399,6 +479,7 @@ const MaxCore: React.FC = () => {
             variant="ghost" 
             size="icon" 
             className="text-cyan-300 hover:text-cyan-100 hover:bg-cyan-500/20 transition-all"
+            onClick={() => handleFooterButtonClick('zap')}
           >
             <Zap size={20} />
           </Button>
@@ -408,6 +489,7 @@ const MaxCore: React.FC = () => {
             variant="ghost" 
             size="icon" 
             className="text-indigo-300 hover:text-indigo-100 hover:bg-indigo-500/20 transition-all"
+            onClick={() => handleFooterButtonClick('info')}
           >
             <Info size={20} />
           </Button>
@@ -417,6 +499,7 @@ const MaxCore: React.FC = () => {
             variant="ghost" 
             size="icon" 
             className="text-purple-400 hover:text-purple-200 hover:bg-purple-500/20 transition-all"
+            onClick={() => handleFooterButtonClick('settings')}
           >
             <Settings size={20} />
           </Button>

@@ -5,6 +5,8 @@
 import modelInference from './ModelInference';
 import weatherService from './WeatherService';
 import directionsService from './DirectionsService';
+import conversationMemory from './ConversationMemory';
+import randomConversation from './RandomConversation';
 
 interface ResponseData {
   text: string;
@@ -89,14 +91,8 @@ const responses = {
     "My pleasure! What else can I assist you with today?"
   ],
   
-  facts: [
-    "The Great Wall of China is not visible from space with the naked eye, contrary to popular belief.",
-    "Honey never spoils. Archaeologists have found pots of honey in ancient Egyptian tombs that are over 3,000 years old and still perfectly good to eat.",
-    "A day on Venus is longer than a year on Venus. It takes 243 Earth days to rotate once on its axis, but only 225 Earth days to orbit the Sun.",
-    "Octopuses have three hearts, nine brains, and blue blood.",
-    "The longest word in the English language without a vowel is 'rhythms'.",
-    "Bananas are berries, but strawberries aren't."
-  ],
+  // We'll use our RandomConversation.ts instead of these hardcoded facts
+  facts: [],
   
   fallback: [
     "I'm still improving my understanding of different topics. Could you rephrase that?",
@@ -120,8 +116,18 @@ const patterns = {
   thanks: /\b(thanks|thank you|appreciate it|grateful)\b/i,
   calculation: /\b(calculate|compute|what is|how much is|solve|math|plus|minus|times|divided by)\b/i,
   directions: /\b(directions|navigate|how (do|can) I get to|route to|way to|map|distance|how far)\b/i,
-  facts: /\b(tell me a fact|random fact|did you know|fun fact|interesting fact)\b/i
+  facts: /\b(tell me a fact|random fact|did you know|fun fact|interesting fact|tell me something interesting)\b/i,
+  chat: /\b(let's chat|let's talk|tell me something|what's new|chat with me|talk to me|conversation)\b/i
 };
+
+// Extended pattern recognition
+const personalQuestions = /\b(how are you|feeling|what do you think|your opinion|do you like|your favorite)\b/i;
+const philosophicalQuestions = /\b(meaning of life|purpose|consciousness|philosophy|existence|reality|truth|knowledge)\b/i;
+const learningQuestions = /\b(do you learn|how do you learn|learning|evolve|improve|get better)\b/i;
+
+// Specific patterns for extracting entities from weather and directions queries
+const weatherLocationPattern = /weather (?:in|at|for) ([a-zA-Z\s]+)/i;
+const directionsPattern = /(?:directions|navigate|route) (?:from|to) ([a-zA-Z\s]+) (?:to|from) ([a-zA-Z\s]+)/i;
 
 const calculationRegex = {
   add: /(\d+)\s*(plus|\+)\s*(\d+)/i,
@@ -130,97 +136,17 @@ const calculationRegex = {
   divide: /(\d+)\s*(divided by|\/)\s*(\d+)/i
 };
 
-// Specific patterns for extracting entities from weather and directions queries
-const weatherLocationPattern = /weather (?:in|at|for) ([a-zA-Z\s]+)/i;
-const directionsPattern = /(?:directions|navigate|route) (?:from|to) ([a-zA-Z\s]+) (?:to|from) ([a-zA-Z\s]+)/i;
-
-class ConversationContext {
-  private topics: string[] = [];
-  private lastTopic: string = '';
-  private lastInput: string = '';
-  private lastResponse: string = '';
-  private consecutiveFallbacks: number = 0;
-  private entityMemory: Map<string, string> = new Map();
-  
-  public addTopic(topic: string) {
-    this.lastTopic = topic;
-    if (!this.topics.includes(topic)) {
-      this.topics.push(topic);
-      if (this.topics.length > 5) {
-        this.topics.shift(); // Keep only the 5 most recent topics
-      }
-    }
-  }
-  
-  public getLastTopic(): string {
-    return this.lastTopic;
-  }
-  
-  public getTopics(): string[] {
-    return [...this.topics];
-  }
-  
-  public setLastInput(input: string) {
-    this.lastInput = input;
-  }
-  
-  public getLastInput(): string {
-    return this.lastInput;
-  }
-  
-  public setLastResponse(response: string) {
-    this.lastResponse = response;
-  }
-  
-  public getLastResponse(): string {
-    return this.lastResponse;
-  }
-  
-  public incrementFallbacks() {
-    this.consecutiveFallbacks++;
-  }
-  
-  public resetFallbacks() {
-    this.consecutiveFallbacks = 0;
-  }
-  
-  public getFallbackCount(): number {
-    return this.consecutiveFallbacks;
-  }
-  
-  public setEntity(type: string, value: string) {
-    this.entityMemory.set(type, value);
-  }
-  
-  public getEntity(type: string): string | undefined {
-    return this.entityMemory.get(type);
-  }
-  
-  public clear() {
-    this.topics = [];
-    this.lastTopic = '';
-    this.lastInput = '';
-    this.lastResponse = '';
-    this.consecutiveFallbacks = 0;
-    this.entityMemory.clear();
-  }
-}
-
 class ResponseGenerator {
-  private static context = new ConversationContext();
   private static useModelInference = true; // Toggle to use model inference
-  
+
   static async getResponse(input: string): Promise<ResponseData> {
-    // Store input in context
-    this.context.setLastInput(input);
-    
     // Normalize input
     const normalizedInput = input.toLowerCase().trim();
     
     // Check for calculation requests first
     const calculationResult = this.handleCalculation(normalizedInput);
     if (calculationResult) {
-      this.context.resetFallbacks();
+      conversationMemory.addExchange(input, calculationResult, 'calculation');
       return { text: calculationResult, shouldSpeak: true };
     }
     
@@ -229,11 +155,9 @@ class ResponseGenerator {
     if (weatherMatch && weatherMatch[1]) {
       try {
         const location = weatherMatch[1].trim();
-        this.context.setEntity('weatherLocation', location);
         const weatherData = await weatherService.getWeather(location);
         const response = weatherService.generateWeatherResponse(weatherData);
-        this.context.setLastResponse(response);
-        this.context.resetFallbacks();
+        conversationMemory.addExchange(input, response, 'weather');
         return { text: response, shouldSpeak: true };
       } catch (error) {
         console.error("Weather error:", error);
@@ -247,12 +171,9 @@ class ResponseGenerator {
       try {
         const from = directionsMatch[1].trim();
         const to = directionsMatch[2].trim();
-        this.context.setEntity('directionsFrom', from);
-        this.context.setEntity('directionsTo', to);
         const directionsData = await directionsService.getDirections(from, to);
         const response = directionsService.generateDirectionsResponse(directionsData);
-        this.context.setLastResponse(response);
-        this.context.resetFallbacks();
+        conversationMemory.addExchange(input, response, 'directions');
         return { text: response, shouldSpeak: true };
       } catch (error) {
         console.error("Directions error:", error);
@@ -266,29 +187,50 @@ class ResponseGenerator {
     for (const [cat, pattern] of Object.entries(patterns)) {
       if (pattern.test(normalizedInput)) {
         category = cat;
-        this.context.addTopic(cat);
-        this.context.resetFallbacks();
         break;
       }
     }
     
-    // If no category was found, try to use context from previous conversation
-    if (!category) {
-      const lastTopic = this.context.getLastTopic();
-      if (lastTopic && patterns[lastTopic as keyof typeof patterns]?.test(normalizedInput)) {
-        category = lastTopic;
-        this.context.resetFallbacks();
-      } else {
-        category = 'fallback';
-        this.context.incrementFallbacks();
-      }
+    // Special handling for random facts requests
+    if (category === 'facts') {
+      const factResponse = randomConversation.getRandomFact();
+      conversationMemory.addExchange(input, factResponse, 'facts');
+      return { text: factResponse, shouldSpeak: true };
+    }
+    
+    // Special handling for jokes
+    if (category === 'joke') {
+      const jokeResponse = responses.joke[Math.floor(Math.random() * responses.joke.length)];
+      conversationMemory.addExchange(input, jokeResponse, 'joke');
+      return { text: jokeResponse, shouldSpeak: true };
+    }
+    
+    // Check for personal questions about Max
+    if (personalQuestions.test(normalizedInput)) {
+      const personalResponse = randomConversation.getEmpatheticResponse();
+      conversationMemory.addExchange(input, personalResponse, 'personal');
+      return { text: personalResponse, shouldSpeak: true };
+    }
+    
+    // Check for philosophical questions
+    if (philosophicalQuestions.test(normalizedInput)) {
+      const philosophicalResponse = randomConversation.getPhilosophicalResponse();
+      conversationMemory.addExchange(input, philosophicalResponse, 'philosophical');
+      return { text: philosophicalResponse, shouldSpeak: true };
+    }
+    
+    // Check for learning questions
+    if (learningQuestions.test(normalizedInput)) {
+      const learningResponse = "I learn from every conversation we have. Each interaction helps me understand context better and improve my responses.";
+      conversationMemory.addExchange(input, learningResponse, 'learning');
+      return { text: learningResponse, shouldSpeak: true };
     }
     
     // Handle time requests with updated time
     if (category === 'time') {
       const now = new Date();
       const timeResponse = `The current time is ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.`;
-      this.context.setLastResponse(timeResponse);
+      conversationMemory.addExchange(input, timeResponse, 'time');
       return { text: timeResponse, shouldSpeak: true };
     }
     
@@ -296,44 +238,40 @@ class ResponseGenerator {
     if (category === 'date') {
       const now = new Date();
       const dateResponse = `Today is ${now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}.`;
-      this.context.setLastResponse(dateResponse);
+      conversationMemory.addExchange(input, dateResponse, 'date');
       return { text: dateResponse, shouldSpeak: true };
     }
     
-    // If we have multiple consecutive fallbacks, try to use model inference for better responses
-    const useFallbackInference = this.context.getFallbackCount() > 1;
+    // Try to generate a random conversational response if appropriate
+    const randomResponse = randomConversation.generateRandomResponse(input);
+    if (randomResponse) {
+      conversationMemory.addExchange(input, randomResponse, 'random');
+      return { text: randomResponse, shouldSpeak: true };
+    }
     
-    // Try to use model inference for generating responses if it's a fallback
-    // or for certain categories that benefit from more natural responses
+    // Try to use model inference for generating responses
     try {
-      if (this.useModelInference && 
-          (category === 'fallback' || 
-           category === 'capabilities' || 
-           category === 'identity' ||
-           useFallbackInference)) {
+      if (this.useModelInference) {
         console.log('Using model inference for response generation');
         
-        // Add some context to the prompt for better responses
+        // Add conversation context for better responses
         let prompt = `You are Max, an advanced AI assistant. The user says: "${input}". `;
         
-        // Add conversation context for better context awareness
-        if (this.context.getLastInput() && this.context.getLastResponse()) {
-          prompt += `Recently, the user said "${this.context.getLastInput()}" and I responded "${this.context.getLastResponse()}". `;
+        // Add conversation history for context
+        const recentHistory = conversationMemory.getRecentHistory(2);
+        if (recentHistory.length > 0) {
+          prompt += "Recent conversation: ";
+          recentHistory.forEach(entry => {
+            prompt += `User: "${entry.input}" You: "${entry.response}" `;
+          });
         }
         
-        if (category === 'capabilities') {
-          prompt += 'Explain what you can do as an AI assistant in a friendly, conversational way.';
-        } else if (category === 'identity') {
-          prompt += 'Explain who you are in a friendly, conversational way.';
-        } else {
-          prompt += 'Respond in a helpful, friendly, and conversational way.';
-        }
+        prompt += 'Respond in a helpful, friendly, and conversational way.';
         
         try {
           const generatedText = await modelInference.generateText(prompt, 150);
           if (generatedText && generatedText.length > 10) {
-            // Store response in context
-            this.context.setLastResponse(generatedText);
+            conversationMemory.addExchange(input, generatedText, 'model-generated');
             return { 
               text: generatedText,
               shouldSpeak: true
@@ -356,14 +294,16 @@ class ResponseGenerator {
       if (Array.isArray(possibleResponses)) {
         responseText = possibleResponses[Math.floor(Math.random() * possibleResponses.length)];
       } else {
-        responseText = responses.fallback[Math.floor(Math.random() * responses.fallback.length)];
+        // Default to a general friendly response
+        responseText = randomConversation.getConversationStarter();
       }
     } else {
-      responseText = responses.fallback[Math.floor(Math.random() * responses.fallback.length)];
+      // No specific category matched, use a conversation starter
+      responseText = randomConversation.getConversationStarter();
     }
     
-    // Store response in context
-    this.context.setLastResponse(responseText);
+    // Store in conversation memory
+    conversationMemory.addExchange(input, responseText, category || 'general');
     
     return { 
       text: responseText,
@@ -408,11 +348,19 @@ class ResponseGenerator {
   }
   
   static clearContext() {
-    this.context.clear();
+    conversationMemory.clearMemory();
   }
   
   static setUseModelInference(use: boolean) {
     this.useModelInference = use;
+  }
+  
+  static getContextualGreeting(): string {
+    return conversationMemory.generateContextualGreeting();
+  }
+  
+  static getWakeUpResponse(): string {
+    return randomConversation.getWakeUpResponse();
   }
 }
 
