@@ -8,10 +8,11 @@ class VoiceRecognition {
   private onEndCallback: (() => void) | null = null;
   private lastTranscript: string = '';
   private listenTimeout: NodeJS.Timeout | null = null;
-  private confidenceThreshold: number = 0.4; // Lowered threshold for better recognition
+  private confidenceThreshold: number = 0.3; // Lower threshold to better catch wake words
   private consecutiveLowConfidence: number = 0;
   private maxConsecutiveLowConfidence: number = 3;
   private noiseFilter: RegExp = /^(\s|um|uh|ah|er|like|so|yeah|just|you know)+$/i;
+  private lastWakeWordTime: number = 0;
   
   constructor() {
     if ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window) {
@@ -65,26 +66,34 @@ class VoiceRecognition {
         return;
       }
       
-      // Handle confidence thresholds with forgiveness mechanism
-      if (confidence >= this.confidenceThreshold || this.checkForWakeWords(transcript)) {
+      // Check for wake words with more permissive threshold
+      if (this.checkForWakeWords(transcript)) {
+        const currentTime = Date.now();
+        // Prevent multiple wake word detections within 3 seconds
+        if (currentTime - this.lastWakeWordTime > 3000) {
+          console.log("Wake word detected with confidence:", confidence);
+          this.lastWakeWordTime = currentTime;
+          if (this.onWakeCallback) {
+            this.onWakeCallback();
+            
+            // Reset the timeout if we detect a wake word
+            if (this.listenTimeout) {
+              clearTimeout(this.listenTimeout);
+              this.listenTimeout = null;
+            }
+          }
+        } else {
+          console.log("Wake word detected but ignored (too soon after previous wake word)");
+        }
+        return; // Return after handling wake word to prevent processing it as content
+      }
+      
+      // Handle confidence thresholds for regular speech
+      if (confidence >= this.confidenceThreshold) {
         this.consecutiveLowConfidence = 0; // Reset counter when we get good confidence
         
         if (transcript !== this.lastTranscript) {
           this.lastTranscript = transcript;
-          
-          // Check for wake words
-          if (this.checkForWakeWords(transcript)) {
-            console.log("Wake word detected with confidence:", confidence);
-            if (this.onWakeCallback) {
-              this.onWakeCallback();
-              
-              // Reset the timeout if we detect a wake word
-              if (this.listenTimeout) {
-                clearTimeout(this.listenTimeout);
-                this.listenTimeout = null;
-              }
-            }
-          }
           
           // Pass the full transcript to callback if provided
           if (this.onResultCallback) {
@@ -92,25 +101,17 @@ class VoiceRecognition {
           }
         }
       } else {
-        // Still consider low confidence results if they contain wake words
-        if (this.checkForWakeWords(transcript)) {
-          console.log("Wake word detected with LOW confidence:", confidence, "- still processing");
-          if (this.onWakeCallback) {
-            this.onWakeCallback();
-          }
-        } else {
-          this.consecutiveLowConfidence++;
-          console.log("Low confidence transcript ignored:", transcript, "Confidence:", confidence, 
-                      "Count:", this.consecutiveLowConfidence);
+        this.consecutiveLowConfidence++;
+        console.log("Low confidence transcript:", transcript, "Confidence:", confidence, 
+                    "Count:", this.consecutiveLowConfidence);
+        
+        // If we've had several consecutive low confidence results, try to use the best one anyway
+        if (this.consecutiveLowConfidence >= this.maxConsecutiveLowConfidence && transcript.length > 5) {
+          console.log("Using low confidence transcript after multiple attempts:", transcript);
+          this.consecutiveLowConfidence = 0;
           
-          // If we've had several consecutive low confidence results, try to use the best one anyway
-          if (this.consecutiveLowConfidence >= this.maxConsecutiveLowConfidence && transcript.length > 5) {
-            console.log("Using low confidence transcript after multiple attempts:", transcript);
-            this.consecutiveLowConfidence = 0;
-            
-            if (this.onResultCallback) {
-              this.onResultCallback(transcript);
-            }
+          if (this.onResultCallback) {
+            this.onResultCallback(transcript);
           }
         }
       }
@@ -167,7 +168,12 @@ class VoiceRecognition {
   }
   
   private checkForWakeWords(transcript: string): boolean {
-    return this.wakeWords.some(wake => transcript.includes(wake));
+    for (const wake of this.wakeWords) {
+      if (transcript.includes(wake)) {
+        return true;
+      }
+    }
+    return false;
   }
   
   private setListenTimeout(duration: number) {
