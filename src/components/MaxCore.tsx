@@ -24,7 +24,8 @@ const MaxCore: React.FC = () => {
   const [isModelLoading, setIsModelLoading] = useState(false);
   const [modelError, setModelError] = useState<string | null>(null);
   const [showFullInterface, setShowFullInterface] = useState(false);
-  const [bubbleSize, setBubbleSize] = useState(80); // Base size for the bubble
+  const [bubbleSize, setBubbleSize] = useState(100); // Larger base size for the bubble
+  const [pulseIntensity, setPulseIntensity] = useState(1);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const voiceRecognition = useRef<VoiceRecognition | null>(null);
   const speechSynthesis = useRef<SpeechSynthesis | null>(null);
@@ -106,12 +107,12 @@ const MaxCore: React.FC = () => {
       }
     }, 10 * 60 * 1000); // Check every 10 minutes
     
-    // Add bubble animation effect
+    // Add bubble animation effect - more intense for Siri-like feel
     const pulseInterval = setInterval(() => {
       if (!isListening && !isProcessing && !isSpeaking) {
-        setBubbleSize(prev => prev === 80 ? 85 : 80); // Subtle pulsing effect when idle
+        setPulseIntensity(prev => (prev === 1 ? 1.05 : 1)); // Subtle pulsing effect when idle
       }
-    }, 2000);
+    }, 1500);
     
     return () => {
       if (voiceRecognition.current) {
@@ -134,13 +135,17 @@ const MaxCore: React.FC = () => {
   useEffect(() => {
     // Animate bubble size based on speech/listening status
     if (isListening) {
-      setBubbleSize(100); // Larger while listening
+      setBubbleSize(120); // Larger while listening
+      setPulseIntensity(1.15);
     } else if (isSpeaking) {
-      setBubbleSize(95); // Medium-large while speaking
+      setBubbleSize(115); // Medium-large while speaking
+      setPulseIntensity(1.1);
     } else if (isProcessing) {
-      setBubbleSize(90); // Medium while processing
+      setBubbleSize(110); // Medium while processing
+      setPulseIntensity(1.05);
     } else if (!showFullInterface) {
-      setBubbleSize(80); // Back to normal when idle
+      setBubbleSize(100); // Back to normal when idle
+      setPulseIntensity(1);
     }
   }, [isListening, isSpeaking, isProcessing, showFullInterface]);
 
@@ -361,210 +366,212 @@ const MaxCore: React.FC = () => {
 
   return (
     <div className="flex flex-col h-screen overflow-hidden">
-      {/* Floating Bubble UI */}
-      {!showFullInterface ? (
-        <div className="fixed inset-0 pointer-events-none flex items-center justify-center">
-          <div 
-            className="bubble-glow animate-float pointer-events-auto cursor-pointer"
-            style={{ 
-              width: `${bubbleSize}px`, 
-              height: `${bubbleSize}px`,
-              transition: 'width 0.3s, height 0.3s' 
-            }}
-            onClick={toggleInterface}
-          >
-            <div className="w-full h-full flex items-center justify-center">
-              <div className={`h-3 w-3 rounded-full ${isSpeaking || isListening ? 'bg-green-400 animate-pulse' : 'bg-purple-400 animate-pulse-slow'}`} />
-            </div>
-          </div>
+      {/* Main Siri-like Background */}
+      <div className="fixed inset-0 bg-gradient-to-br from-purple-900 via-indigo-900 to-blue-900 overflow-hidden">
+        {/* Animated background effects */}
+        <div className="fixed inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute top-1/4 left-1/4 w-96 h-96 rounded-full bg-purple-600/20 blur-3xl"></div>
+          <div className="absolute bottom-1/3 right-1/3 w-[30rem] h-[30rem] rounded-full bg-blue-500/20 blur-3xl"></div>
+          <div className="absolute top-2/3 left-1/2 w-80 h-80 rounded-full bg-cyan-400/20 blur-3xl"></div>
         </div>
-      ) : (
-        <div className="flex flex-col h-screen bg-gradient-to-b from-purple-900 via-blue-900 to-black overflow-hidden">
-          {/* Animated background circles */}
-          <div className="fixed inset-0 overflow-hidden pointer-events-none">
-            <div className="absolute top-1/4 left-1/4 w-80 h-80 rounded-full bg-purple-600 opacity-10 blur-3xl animate-pulse-slow"></div>
-            <div className="absolute bottom-1/3 right-1/3 w-96 h-96 rounded-full bg-blue-500 opacity-10 blur-3xl animate-pulse-slow"></div>
-            <div className="absolute top-2/3 left-1/2 w-64 h-64 rounded-full bg-cyan-400 opacity-10 blur-3xl animate-pulse-slow"></div>
-          </div>
-          
-          {/* Header bar */}
-          <div className="w-full p-3 bg-black/40 backdrop-blur-md border-b border-purple-500/30 flex justify-between items-center z-10">
-            <div className="flex items-center space-x-2">
-              <div className={`h-3 w-3 rounded-full ${isSpeaking || isListening ? 'bg-green-400 animate-pulse' : 'bg-purple-400 animate-pulse-slow'}`} />
-              <span className="text-purple-300 font-semibold tracking-wider text-xs md:text-sm">
-                MAX {isModelLoading ? 'LOADING MODELS' : isSpeaking ? 'SPEAKING' : isListening ? 'LISTENING' : 'READY'}
-              </span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="text-purple-300 hover:text-purple-100 hover:bg-purple-500/20 transition-all"
-                onClick={toggleInterface}
+        
+        {/* Centered Siri-like bubble */}
+        <div className="fixed inset-0 flex items-center justify-center">
+          {!showFullInterface ? (
+            // Siri-like floating bubble
+            <div 
+              onClick={toggleInterface}
+              className="cursor-pointer transition-all duration-300 ease-in-out transform"
+              style={{ transform: `scale(${pulseIntensity})` }}
+            >
+              <div 
+                className="relative rounded-full shadow-2xl"
+                style={{ 
+                  width: `${bubbleSize}px`, 
+                  height: `${bubbleSize}px` 
+                }}
               >
-                <X size={18} />
-              </Button>
-            </div>
-          </div>
-
-          {/* Main content area */}
-          <div className="flex-1 overflow-hidden flex flex-col p-4">
-            {/* AI assistant info card */}
-            <div className="backdrop-blur-lg bg-purple-500/10 rounded-2xl p-4 mb-4 text-center border border-purple-500/20 shadow-lg shadow-purple-500/10">
-              <h1 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-cyan-300 mb-2">MAX</h1>
-              <p className="text-sm text-gray-300">Your Personal AI Assistant</p>
-              <p className="text-xs text-gray-400 mt-2">
-                Say "Hey Max" or use the microphone button to activate voice commands
-              </p>
-              {isModelLoading && (
-                <div className="mt-2 text-xs text-yellow-300">
-                  Loading AI models... This might take a moment.
-                </div>
-              )}
-              {modelError && (
-                <div className="mt-2 text-xs text-red-400">
-                  {modelError}
-                </div>
-              )}
-            </div>
-
-            {/* Messages container */}
-            <div className="flex-1 overflow-y-auto pr-2 mb-4 space-y-4">
-              {messages.map((message, index) => (
-                <div 
-                  key={index} 
-                  className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
-                >
-                  <div 
-                    className={`max-w-[80%] md:max-w-[70%] rounded-2xl p-3 animate-fade-in ${
-                      message.type === 'user' 
-                        ? 'bg-gradient-to-br from-indigo-600/40 to-indigo-900/40 backdrop-blur-md text-white border border-indigo-400/20 shadow-lg shadow-indigo-500/10' 
-                        : 'bg-gradient-to-br from-purple-500/30 to-blue-600/30 backdrop-blur-md text-blue-100 border border-blue-400/20 shadow-lg shadow-blue-500/10'
-                    }`}
-                  >
-                    <div className={`text-xs mb-1 ${message.type === 'user' ? 'text-indigo-300' : 'text-purple-300'}`}>
-                      {message.type === 'user' ? 'You' : 'MAX'} • {formatTime(message.timestamp)}
-                    </div>
-                    <div className="text-sm whitespace-pre-wrap">{message.content}</div>
-                  </div>
-                </div>
-              ))}
-              
-              {isTyping && (
-                <div className="flex justify-start">
-                  <div className="bg-gradient-to-br from-purple-500/30 to-blue-600/30 backdrop-blur-md rounded-2xl p-3 max-w-[80%] border border-blue-400/20 shadow-lg shadow-blue-500/10">
-                    <div className="text-xs mb-1 text-purple-300">
-                      MAX • {formatTime(new Date())}
-                    </div>
-                    <div className="typing-indicator">
-                      <span></span>
-                      <span></span>
-                      <span></span>
-                    </div>
-                  </div>
-                </div>
-              )}
-              
-              <div ref={messagesEndRef} />
-            </div>
-
-            {/* Audio visualizer */}
-            <div className="mb-4">
-              <AudioVisualizer isActive={isListening || isProcessing || isTyping || isSpeaking} />
-            </div>
-
-            {/* Input area */}
-            <div className="relative">
-              <div className="flex space-x-2">
-                <Button 
-                  variant="outline" 
-                  size="icon" 
-                  className={`${isListening ? 'bg-green-500/80 text-white animate-pulse' : 'bg-purple-900/50 text-purple-300'} rounded-full border border-purple-400/30 shadow-md hover:bg-purple-700/50 transition-all duration-300`}
-                  onClick={toggleListening}
-                  disabled={isModelLoading}
-                >
-                  {isListening ? <MicOff size={18} /> : <Mic size={18} />}
-                </Button>
+                {/* Outer glow */}
+                <div className="absolute inset-0 rounded-full bg-gradient-to-br from-blue-500/30 to-purple-600/30 blur-xl"></div>
                 
-                <div className="relative flex-1">
-                  <input
-                    type="text"
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    onKeyPress={handleKeyPress}
-                    placeholder={isModelLoading ? "Loading AI models..." : "Type your message or use voice..."}
-                    className="w-full p-3 pr-10 bg-purple-900/20 backdrop-blur-md border border-purple-500/30 rounded-full text-white focus:ring-2 focus:ring-purple-500/50 focus:outline-none shadow-inner"
-                    disabled={isProcessing || isModelLoading}
-                  />
+                {/* Main bubble */}
+                <div className="absolute inset-0 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 opacity-90"></div>
+                
+                {/* Inner bubble with animation */}
+                <div className="absolute inset-2 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 opacity-80 flex items-center justify-center">
+                  <div className={`flex items-center justify-center h-full w-full`}>
+                    <div className="relative flex items-center justify-center">
+                      <div className={`h-12 w-12 flex items-center justify-center ${isListening || isSpeaking ? 'animate-pulse' : ''}`}>
+                        {isListening ? (
+                          // Sound wave animation when listening
+                          <div className="flex items-center justify-center space-x-1">
+                            <div className="h-4 w-1 bg-white rounded-full animate-[wave_0.5s_ease-in-out_infinite]" style={{ animationDelay: '0s' }}></div>
+                            <div className="h-6 w-1 bg-white rounded-full animate-[wave_0.5s_ease-in-out_infinite]" style={{ animationDelay: '0.1s' }}></div>
+                            <div className="h-8 w-1 bg-white rounded-full animate-[wave_0.5s_ease-in-out_infinite]" style={{ animationDelay: '0.2s' }}></div>
+                            <div className="h-6 w-1 bg-white rounded-full animate-[wave_0.5s_ease-in-out_infinite]" style={{ animationDelay: '0.3s' }}></div>
+                            <div className="h-4 w-1 bg-white rounded-full animate-[wave_0.5s_ease-in-out_infinite]" style={{ animationDelay: '0.4s' }}></div>
+                          </div>
+                        ) : isSpeaking ? (
+                          // Speaking animation
+                          <div className="flex items-center justify-center space-x-1">
+                            <div className="h-3 w-1 bg-white rounded-full animate-[wave_0.7s_ease-in-out_infinite]" style={{ animationDelay: '0s' }}></div>
+                            <div className="h-5 w-1 bg-white rounded-full animate-[wave_0.7s_ease-in-out_infinite]" style={{ animationDelay: '0.1s' }}></div>
+                            <div className="h-4 w-1 bg-white rounded-full animate-[wave_0.7s_ease-in-out_infinite]" style={{ animationDelay: '0.2s' }}></div>
+                          </div>
+                        ) : (
+                          // Idle pulsing dot
+                          <div className="h-4 w-4 bg-white rounded-full opacity-80 animate-pulse-slow"></div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            // Full interface when activated
+            <div className="absolute inset-x-4 bottom-4 top-16 bg-black/40 rounded-3xl backdrop-blur-lg border border-white/10 shadow-2xl overflow-hidden flex flex-col">
+              {/* Header */}
+              <div className="w-full p-4 bg-black/40 border-b border-white/10 flex justify-between items-center">
+                <div className="flex items-center space-x-2">
+                  <div className={`h-3 w-3 rounded-full ${isSpeaking || isListening ? 'bg-green-400 animate-pulse' : 'bg-purple-400 animate-pulse-slow'}`} />
+                  <span className="text-purple-300 font-semibold tracking-wider text-xs md:text-sm">
+                    MAX {isModelLoading ? 'LOADING MODELS' : isSpeaking ? 'SPEAKING' : isListening ? 'LISTENING' : 'READY'}
+                  </span>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="text-white/70 hover:text-white hover:bg-white/10"
+                  onClick={toggleInterface}
+                >
+                  <X size={18} />
+                </Button>
+              </div>
+              
+              {/* Conversation area */}
+              <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                {messages.map((message, index) => (
+                  <div 
+                    key={index} 
+                    className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
+                  >
+                    <div 
+                      className={`max-w-[80%] rounded-2xl p-3 animate-fade-in ${
+                        message.type === 'user' 
+                          ? 'bg-blue-500/40 text-white backdrop-blur-sm border border-blue-400/30' 
+                          : 'bg-purple-500/40 text-white backdrop-blur-sm border border-purple-400/30'
+                      }`}
+                    >
+                      <div className="text-xs opacity-70 mb-1">
+                        {message.type === 'user' ? 'You' : 'MAX'} • {formatTime(message.timestamp)}
+                      </div>
+                      <div className="text-sm">{message.content}</div>
+                    </div>
+                  </div>
+                ))}
+                
+                {isTyping && (
+                  <div className="flex justify-start">
+                    <div className="bg-purple-500/40 backdrop-blur-sm rounded-2xl p-3 max-w-[80%] border border-purple-400/30">
+                      <div className="text-xs opacity-70 mb-1">
+                        MAX • {formatTime(new Date())}
+                      </div>
+                      <div className="typing-indicator">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
+                <div ref={messagesEndRef} />
+              </div>
+              
+              {/* Input area */}
+              <div className="p-4 border-t border-white/10 bg-black/30">
+                <div className="flex space-x-2">
+                  <Button 
+                    variant="outline" 
+                    size="icon" 
+                    className={`${isListening ? 'bg-green-500 text-white animate-pulse' : 'bg-white/10 text-white/80'} rounded-full border-white/20 hover:bg-white/20`}
+                    onClick={toggleListening}
+                    disabled={isModelLoading}
+                  >
+                    {isListening ? <MicOff size={18} /> : <Mic size={18} />}
+                  </Button>
+                  
+                  <div className="relative flex-1">
+                    <input
+                      type="text"
+                      value={input}
+                      onChange={(e) => setInput(e.target.value)}
+                      onKeyPress={handleKeyPress}
+                      placeholder={isModelLoading ? "Loading AI models..." : "Type your message..."}
+                      className="w-full p-3 pr-10 bg-white/10 backdrop-blur-sm border border-white/20 rounded-full text-white focus:outline-none focus:ring-2 focus:ring-white/30"
+                      disabled={isProcessing || isModelLoading}
+                    />
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-white/70 hover:text-white hover:bg-transparent"
+                      onClick={() => handleSend()}
+                      disabled={!input.trim() || isProcessing || isModelLoading}
+                    >
+                      <Send size={18} />
+                    </Button>
+                  </div>
+                </div>
+                
+                {/* Footer buttons */}
+                <div className="flex justify-center mt-4 space-x-6">
                   <Button 
                     variant="ghost" 
                     size="icon" 
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-purple-300 hover:text-purple-100 hover:bg-transparent"
-                    onClick={() => handleSend()}
-                    disabled={!input.trim() || isProcessing || isModelLoading}
+                    className="text-white/70 hover:text-white hover:bg-white/10 rounded-full"
+                    onClick={() => handleFooterButtonClick('brain')}
                   >
-                    <Send size={18} />
+                    <Brain size={20} />
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="text-white/70 hover:text-white hover:bg-white/10 rounded-full"
+                    onClick={() => handleFooterButtonClick('message')}
+                  >
+                    <MessageCircle size={20} />
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="text-white/70 hover:text-white hover:bg-white/10 rounded-full"
+                    onClick={() => handleFooterButtonClick('zap')}
+                  >
+                    <Zap size={20} />
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="text-white/70 hover:text-white hover:bg-white/10 rounded-full"
+                    onClick={() => handleFooterButtonClick('info')}
+                  >
+                    <Info size={20} />
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="text-white/70 hover:text-white hover:bg-white/10 rounded-full"
+                    onClick={() => handleFooterButtonClick('settings')}
+                  >
+                    <Settings size={20} />
                   </Button>
                 </div>
               </div>
             </div>
-          </div>
-
-          {/* Footer with action buttons */}
-          <div className="w-full p-2 bg-black/40 backdrop-blur-md border-t border-purple-500/30 flex justify-center space-x-6">
-            <Tooltip>
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="text-purple-300 hover:text-purple-100 hover:bg-purple-500/20 transition-all"
-                onClick={() => handleFooterButtonClick('brain')}
-              >
-                <Brain size={20} />
-              </Button>
-            </Tooltip>
-            <Tooltip>
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="text-blue-300 hover:text-blue-100 hover:bg-blue-500/20 transition-all"
-                onClick={() => handleFooterButtonClick('message')}
-              >
-                <MessageCircle size={20} />
-              </Button>
-            </Tooltip>
-            <Tooltip>
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="text-cyan-300 hover:text-cyan-100 hover:bg-cyan-500/20 transition-all"
-                onClick={() => handleFooterButtonClick('zap')}
-              >
-                <Zap size={20} />
-              </Button>
-            </Tooltip>
-            <Tooltip>
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="text-indigo-300 hover:text-indigo-100 hover:bg-indigo-500/20 transition-all"
-                onClick={() => handleFooterButtonClick('info')}
-              >
-                <Info size={20} />
-              </Button>
-            </Tooltip>
-            <Tooltip>
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="text-purple-400 hover:text-purple-200 hover:bg-purple-500/20 transition-all"
-                onClick={() => handleFooterButtonClick('settings')}
-              >
-                <Settings size={20} />
-              </Button>
-            </Tooltip>
-          </div>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 };

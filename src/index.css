@@ -91,78 +91,27 @@
   }
 
   body {
-    @apply bg-jarvis-dark text-white;
+    @apply bg-black text-white;
+    overflow: hidden;
   }
   
   /* Custom scrollbar */
   ::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
+    width: 4px;
+    height: 4px;
   }
   
   ::-webkit-scrollbar-track {
-    @apply bg-jarvis-dark;
+    @apply bg-black/20;
   }
   
   ::-webkit-scrollbar-thumb {
-    @apply bg-jarvis-primary rounded-full;
+    @apply bg-white/30 rounded-full;
   }
   
   ::-webkit-scrollbar-thumb:hover {
-    @apply bg-jarvis-secondary;
+    @apply bg-white/50;
   }
-}
-
-/* Glass effect */
-.glass {
-  background: rgba(30, 136, 229, 0.1);
-  backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-/* Voice bar animation */
-.voice-bar {
-  height: 30px;
-  width: 4px;
-  display: inline-block;
-  margin: 0 2px;
-  border-radius: 2px;
-  animation: wave 0.5s ease-in-out infinite;
-  animation-delay: calc(var(--delay) * 0.1s);
-}
-
-/* Audio wave visualization */
-.audio-wave-container {
-  height: 40px;
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 3px;
-}
-
-.audio-wave-bar {
-  height: 100%;
-  width: 3px;
-  background-color: #1E88E5;
-  border-radius: 3px;
-  transition: height 0.2s ease;
-}
-
-/* Futuristic glowing effect */
-.glow {
-  box-shadow: 0 0 10px rgba(0, 229, 255, 0.5), 0 0 20px rgba(0, 229, 255, 0.3);
-}
-
-.glow-text {
-  text-shadow: 0 0 10px rgba(0, 229, 255, 0.7);
-}
-
-/* Circle pulse animation */
-.circle-pulse {
-  position: absolute;
-  border-radius: 50%;
-  animation: pulse-slow 3s infinite;
 }
 
 /* Typing indicator */
@@ -175,7 +124,7 @@
 .typing-indicator span {
   height: 8px;
   width: 8px;
-  background-color: #a855f7;
+  background-color: white;
   border-radius: 50%;
   display: block;
   opacity: 0.7;
@@ -193,7 +142,7 @@
   animation: pulse-slow 1s infinite 0.4s;
 }
 
-/* New animations for the bubble UI */
+/* Animations */
 @keyframes pulse-slow {
   0% {
     transform: scale(0.8);
@@ -223,16 +172,16 @@
 
 @keyframes glow-pulse {
   0% {
-    box-shadow: 0 0 5px rgba(168, 85, 247, 0.5),
-                0 0 10px rgba(168, 85, 247, 0.3);
+    box-shadow: 0 0 15px rgba(30, 136, 229, 0.5),
+                0 0 30px rgba(30, 136, 229, 0.3);
   }
   50% {
-    box-shadow: 0 0 15px rgba(168, 85, 247, 0.7),
-                0 0 30px rgba(168, 85, 247, 0.5);
+    box-shadow: 0 0 30px rgba(30, 136, 229, 0.7),
+                0 0 60px rgba(30, 136, 229, 0.5);
   }
   100% {
-    box-shadow: 0 0 5px rgba(168, 85, 247, 0.5),
-                0 0 10px rgba(168, 85, 247, 0.3);
+    box-shadow: 0 0 15px rgba(30, 136, 229, 0.5),
+                0 0 30px rgba(30, 136, 229, 0.3);
   }
 }
 
@@ -247,6 +196,18 @@
   }
 }
 
+@keyframes wave {
+  0% {
+    height: 10%;
+  }
+  50% {
+    height: 100%;
+  }
+  100% {
+    height: 10%;
+  }
+}
+
 .animate-fade-in {
   animation: fade-in 0.5s ease-out forwards;
 }
@@ -255,25 +216,7 @@
   animation: float 6s ease-in-out infinite;
 }
 
-.animate-glow-pulse {
-  animation: glow-pulse 3s ease-in-out infinite;
-}
-
 .animate-pulse-slow {
   animation: pulse-slow 3s infinite;
-}
-
-/* Bubble UI specific styles */
-.bubble {
-  @apply rounded-full bg-gradient-to-br from-purple-500/40 to-indigo-600/40 backdrop-blur-md border border-purple-300/30;
-  box-shadow: 0 0 15px rgba(168, 85, 247, 0.3),
-              inset 0 0 10px rgba(255, 255, 255, 0.1);
-}
-
-.bubble-glow {
-  @apply rounded-full;
-  box-shadow: 0 0 15px rgba(168, 85, 247, 0.5),
-              0 0 30px rgba(168, 85, 247, 0.3),
-              inset 0 0 10px rgba(255, 255, 255, 0.2);
 }
 
