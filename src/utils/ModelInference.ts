@@ -174,6 +174,42 @@ class ModelInference {
           response = "I'd love to play some music for you. In a full implementation, I would connect to your favorite music services. What genre would you like to listen to?";
         } else if (prompt.includes("translate")) {
           response = "I can help translate between many languages. Just tell me what you'd like translated and to which language.";
+        } else if (prompt.includes("location")) {
+          response = "Based on your IP address, it appears you're located in San Francisco, California. However, for more accurate location information, you may need to enable location services.";
+        } else if (prompt.includes("fact") || prompt.includes("random fact")) {
+          const facts = [
+            "Honey never spoils. Archaeologists have found pots of honey in ancient Egyptian tombs that are over 3,000 years old and still perfectly good to eat.",
+            "A day on Venus is longer than a year on Venus. It takes Venus 243 Earth days to rotate once on its axis but only 225 Earth days to orbit the Sun.",
+            "The shortest war in history was between Britain and Zanzibar on August 27, 1896. Zanzibar surrendered after 38 minutes.",
+            "The Eiffel Tower can be 15 cm taller during the summer due to thermal expansion of the iron.",
+            "Octopuses have three hearts, nine brains, and blue blood.",
+            "A group of flamingos is called a 'flamboyance'.",
+            "The fingerprints of koalas are so similar to humans that they have on occasion been confused at crime scenes.",
+            "A bolt of lightning is five times hotter than the surface of the sun."
+          ];
+          response = facts[Math.floor(Math.random() * facts.length)];
+        } else if (prompt.includes("mood") && (prompt.includes("song") || prompt.includes("music"))) {
+          const moodMap: Record<string, string[]> = {
+            happy: ["'Happy' by Pharrell Williams", "'Walking on Sunshine' by Katrina and the Waves", "'Can't Stop the Feeling' by Justin Timberlake"],
+            sad: ["'Someone Like You' by Adele", "'Fix You' by Coldplay", "'Hurt' by Johnny Cash"],
+            relaxed: ["'Weightless' by Marconi Union", "'Claire de Lune' by Debussy", "'Breathe' by Pink Floyd"],
+            energetic: ["'Eye of the Tiger' by Survivor", "'Uptown Funk' by Mark Ronson ft. Bruno Mars", "'Can't Hold Us' by Macklemore & Ryan Lewis"]
+          };
+          
+          let moodType = "general";
+          for (const mood in moodMap) {
+            if (prompt.toLowerCase().includes(mood)) {
+              moodType = mood;
+              break;
+            }
+          }
+          
+          if (moodType === "general") {
+            response = "I'd be happy to suggest some songs! What kind of mood are you in? Happy, sad, relaxed, energetic?";
+          } else {
+            const songs = moodMap[moodType];
+            response = `Based on your ${moodType} mood, you might enjoy: ${songs.join(', ')}`;
+          }
         } else {
           // More nuanced general responses
           const generalResponses = [

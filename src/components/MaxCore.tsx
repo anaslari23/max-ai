@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Mic, MicOff, Send, X } from 'lucide-react';
+import { Mic, MicOff, Send, X, MessageSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
@@ -20,7 +20,7 @@ const MaxCore: React.FC = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const [showChat, setShowChat] = useState(false);
+  const [showChatInput, setShowChatInput] = useState(false);
   
   // Refs
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -43,9 +43,6 @@ const MaxCore: React.FC = () => {
         console.log("WAKE WORD DETECTED, ACTIVATING MAX");
         
         if (!isListening && !isProcessing) {
-          // Expand the bubble when wake word is detected
-          setShowChat(true);
-          
           const wakeResponse = ResponseGenerator.getWakeUpResponse();
           setMessages(prev => [...prev, { 
             type: 'max', 
@@ -243,17 +240,8 @@ const MaxCore: React.FC = () => {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
-  const toggleChat = () => {
-    setShowChat(!showChat);
-    
-    // If we're opening the chat, try to activate AI
-    if (!showChat) {
-      try {
-        modelInference.preloadModel('textGeneration');
-      } catch (e) {
-        console.error("Error preloading model:", e);
-      }
-    }
+  const toggleChatInput = () => {
+    setShowChatInput(!showChatInput);
   };
 
   return (
@@ -267,123 +255,126 @@ const MaxCore: React.FC = () => {
           <div className="absolute top-2/3 left-1/2 w-80 h-80 rounded-full bg-blue-900/10 blur-3xl"></div>
         </div>
         
-        {/* Centered hologram bubble */}
+        {/* Center area with all interactive elements */}
         <div className="fixed inset-0 flex items-center justify-center">
-          {!showChat ? (
-            // 3D Hologram center bubble
-            <div 
-              className="cursor-pointer w-80 h-80 rounded-full transition-all duration-500"
-              onClick={toggleChat}
-            >
-              <ThreeJSBubble 
-                isListening={isListening}
-                isSpeaking={isSpeaking}
-                isProcessing={isProcessing}
-                onClick={toggleChat}
-              />
+          <div className="flex flex-col items-center justify-center w-full max-w-4xl px-4">
+            {/* Logo title - no animation */}
+            <div className="mb-8">
+              <div className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-teal-400 via-purple-400 to-blue-400 text-transparent bg-clip-text">
+                MAX AI ASSISTANT
+              </div>
             </div>
-          ) : (
-            // Chat interface
-            <div className="absolute inset-x-4 bottom-4 top-16 bg-black/40 rounded-3xl backdrop-blur-lg border border-teal-500/20 shadow-2xl overflow-hidden flex flex-col">
-              {/* Header */}
-              <div className="w-full p-4 bg-black/40 border-b border-teal-500/10 flex justify-between items-center">
-                <div className="flex items-center space-x-2">
-                  <div className={`h-3 w-3 rounded-full ${isSpeaking || isListening ? 'bg-teal-400 animate-pulse' : 'bg-purple-400 animate-pulse-slow'}`} />
-                  <span className="text-teal-300 font-semibold tracking-wider text-xs md:text-sm">
-                    MAX {isSpeaking ? 'SPEAKING' : isListening ? 'LISTENING' : 'READY'}
-                  </span>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="text-white/70 hover:text-white hover:bg-white/10"
-                  onClick={toggleChat}
-                >
-                  <X size={18} />
-                </Button>
-              </div>
-              
-              {/* Conversation area */}
-              <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                {messages.map((message, index) => (
-                  <div 
-                    key={index} 
-                    className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
-                  >
-                    <div 
-                      className={`max-w-[80%] rounded-2xl p-3 animate-fade-in ${
-                        message.type === 'user' 
-                          ? 'bg-blue-500/40 text-white backdrop-blur-sm border border-blue-400/30' 
-                          : 'bg-purple-500/40 text-white backdrop-blur-sm border border-purple-400/30'
-                      }`}
-                    >
-                      <div className="text-xs opacity-70 mb-1">
-                        {message.type === 'user' ? 'You' : 'MAX'} • {formatTime(message.timestamp)}
-                      </div>
-                      <div className="text-sm">{message.content}</div>
-                    </div>
-                  </div>
-                ))}
-                
-                {isTyping && (
-                  <div className="flex justify-start">
-                    <div className="bg-purple-500/40 backdrop-blur-sm rounded-2xl p-3 max-w-[80%] border border-purple-400/30">
-                      <div className="text-xs opacity-70 mb-1">
-                        MAX • {formatTime(new Date())}
-                      </div>
-                      <div className="typing-indicator">
-                        <span></span>
-                        <span></span>
-                        <span></span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-                
-                <div ref={messagesEndRef} />
-              </div>
-              
-              {/* Input area */}
-              <div className="p-4 border-t border-teal-500/10 bg-black/30">
-                <div className="flex space-x-2">
-                  <Button 
-                    variant="outline" 
-                    size="icon" 
-                    className={`${isListening ? 'bg-teal-500 text-white animate-pulse' : 'bg-teal-950 text-teal-400 border-teal-800'} rounded-full hover:bg-teal-900 hover:text-teal-200`}
+            
+            {/* Bubble and Chat area - Combined in one view */}
+            <div className="relative w-full flex flex-col md:flex-row items-center gap-6">
+              {/* 3D Hologram Bubble - always present */}
+              <div className="w-60 h-60 md:w-80 md:h-80 relative z-10">
+                <ThreeJSBubble 
+                  isListening={isListening}
+                  isSpeaking={isSpeaking}
+                  isProcessing={isProcessing}
+                  onClick={startListening}
+                />
+                <div className="absolute bottom-0 left-1/2 -translate-x-1/2 -mb-4">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className={`${isListening ? 'bg-teal-500 text-white' : 'bg-teal-900/50 text-teal-400 border-teal-800'} rounded-full hover:bg-teal-700`}
                     onClick={toggleListening}
                   >
                     {isListening ? <MicOff size={18} /> : <Mic size={18} />}
                   </Button>
-                  
-                  <div className="relative flex-1">
-                    <Textarea
-                      value={input}
-                      onChange={(e) => setInput(e.target.value)}
-                      onKeyPress={handleKeyPress}
-                      placeholder="Type your message..."
-                      className="w-full p-3 pr-10 bg-black/60 backdrop-blur-sm border border-teal-900/50 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-teal-500/30 min-h-[60px] max-h-[120px] resize-none"
-                      disabled={isProcessing}
-                    />
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-teal-400 hover:text-teal-200 hover:bg-transparent"
-                      onClick={() => handleSend()}
-                      disabled={!input.trim() || isProcessing}
-                    >
-                      <Send size={18} />
-                    </Button>
-                  </div>
                 </div>
               </div>
+              
+              {/* Chat area - always visible */}
+              <div className="w-full md:max-w-xl bg-black/40 rounded-2xl backdrop-blur-md border border-teal-500/20 shadow-2xl overflow-hidden flex flex-col h-[400px] md:h-[500px]">
+                {/* Chat header */}
+                <div className="w-full p-3 bg-black/40 border-b border-teal-500/10 flex justify-between items-center">
+                  <div className="flex items-center space-x-2">
+                    <div className={`h-3 w-3 rounded-full ${isSpeaking || isListening ? 'bg-teal-400 animate-pulse' : 'bg-purple-400'}`} />
+                    <span className="text-teal-300 font-semibold tracking-wider text-xs md:text-sm">
+                      MAX {isSpeaking ? 'SPEAKING' : isListening ? 'LISTENING' : 'READY'}
+                    </span>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="text-white/70 hover:text-white hover:bg-white/10"
+                    onClick={toggleChatInput}
+                  >
+                    <MessageSquare size={18} />
+                  </Button>
+                </div>
+                
+                {/* Conversation area */}
+                <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                  {messages.map((message, index) => (
+                    <div 
+                      key={index} 
+                      className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
+                    >
+                      <div 
+                        className={`max-w-[80%] rounded-2xl p-3 ${
+                          message.type === 'user' 
+                            ? 'bg-blue-500/40 text-white backdrop-blur-sm border border-blue-400/30' 
+                            : 'bg-purple-500/40 text-white backdrop-blur-sm border border-purple-400/30'
+                        }`}
+                      >
+                        <div className="text-xs opacity-70 mb-1">
+                          {message.type === 'user' ? 'You' : 'MAX'} • {formatTime(message.timestamp)}
+                        </div>
+                        <div className="text-sm">{message.content}</div>
+                      </div>
+                    </div>
+                  ))}
+                  
+                  {isTyping && (
+                    <div className="flex justify-start">
+                      <div className="bg-purple-500/40 backdrop-blur-sm rounded-2xl p-3 max-w-[80%] border border-purple-400/30">
+                        <div className="text-xs opacity-70 mb-1">
+                          MAX • {formatTime(new Date())}
+                        </div>
+                        <div className="typing-indicator">
+                          <span></span>
+                          <span></span>
+                          <span></span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  
+                  <div ref={messagesEndRef} />
+                </div>
+                
+                {/* Input area - conditionally shown */}
+                {showChatInput && (
+                  <div className="p-3 border-t border-teal-500/10 bg-black/30">
+                    <div className="flex space-x-2">
+                      <div className="relative flex-1">
+                        <Textarea
+                          value={input}
+                          onChange={(e) => setInput(e.target.value)}
+                          onKeyPress={handleKeyPress}
+                          placeholder="Type your message..."
+                          className="w-full p-3 pr-10 bg-black/60 backdrop-blur-sm border border-teal-900/50 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-teal-500/30 min-h-[50px] max-h-[100px] resize-none"
+                          disabled={isProcessing}
+                        />
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-teal-400 hover:text-teal-200 hover:bg-transparent"
+                          onClick={() => handleSend()}
+                          disabled={!input.trim() || isProcessing}
+                        >
+                          <Send size={18} />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
-          )}
-        </div>
-        
-        {/* Animated logo and brand in top-center */}
-        <div className="absolute top-4 left-0 right-0 flex justify-center">
-          <div className="text-xl md:text-2xl font-bold bg-gradient-to-r from-teal-400 via-purple-400 to-blue-400 text-transparent bg-clip-text animate-pulse-slow">
-            MAX AI ASSISTANT
           </div>
         </div>
       </div>
