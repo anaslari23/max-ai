@@ -4,6 +4,7 @@ import { Mic, MicOff, Send, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
+import ThreeJSBubble from './ThreeJSBubble';
 import ResponseGenerator from '../utils/ResponseGenerator';
 import VoiceRecognition from '../utils/VoiceRecognition';
 import SpeechSynthesis from '../utils/SpeechSynthesis';
@@ -19,9 +20,7 @@ const MaxCore: React.FC = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const [showFullInterface, setShowFullInterface] = useState(false);
-  const [bubbleSize, setBubbleSize] = useState(150); // Larger base size for the bubble
-  const [pulseIntensity, setPulseIntensity] = useState(1);
+  const [showChat, setShowChat] = useState(false);
   
   // Refs
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -45,7 +44,7 @@ const MaxCore: React.FC = () => {
         
         if (!isListening && !isProcessing) {
           // Expand the bubble when wake word is detected
-          setShowFullInterface(true);
+          setShowChat(true);
           
           const wakeResponse = ResponseGenerator.getWakeUpResponse();
           setMessages(prev => [...prev, { 
@@ -96,12 +95,12 @@ const MaxCore: React.FC = () => {
       }
     }, 1000);
     
-    // Add bubble animation effect
-    const pulseInterval = setInterval(() => {
-      if (!isListening && !isProcessing && !isSpeaking) {
-        setPulseIntensity(prev => (prev === 1 ? 1.05 : 1)); // Subtle pulsing effect when idle
-      }
-    }, 1500);
+    // Try to load the AI model for better responses
+    try {
+      modelInference.preloadModel('textGeneration');
+    } catch (e) {
+      console.error("Error preloading AI model:", e);
+    }
     
     return () => {
       if (voiceRecognition.current) {
@@ -110,7 +109,6 @@ const MaxCore: React.FC = () => {
       if (speechSynthesis.current) {
         speechSynthesis.current.cancel();
       }
-      clearInterval(pulseInterval);
     };
   }, []);
 
@@ -120,24 +118,6 @@ const MaxCore: React.FC = () => {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages]);
-
-  // Animate bubble based on state
-  useEffect(() => {
-    // Animate bubble size based on speech/listening status
-    if (isListening) {
-      setBubbleSize(180); // Larger while listening
-      setPulseIntensity(1.15);
-    } else if (isSpeaking) {
-      setBubbleSize(170); // Medium-large while speaking
-      setPulseIntensity(1.1);
-    } else if (isProcessing) {
-      setBubbleSize(160); // Medium while processing
-      setPulseIntensity(1.05);
-    } else if (!showFullInterface) {
-      setBubbleSize(150); // Back to normal when idle
-      setPulseIntensity(1);
-    }
-  }, [isListening, isSpeaking, isProcessing, showFullInterface]);
 
   const toggleListening = () => {
     if (isListening) {
@@ -212,20 +192,6 @@ const MaxCore: React.FC = () => {
     setIsProcessing(true);
     setIsTyping(true);
     
-    // Try to load the AI model for better responses
-    try {
-      if (!modelInference.getModelStatus().textGeneration) {
-        modelInference.preloadModel('textGeneration').then(success => {
-          if (success) {
-            console.log("AI model loaded successfully");
-            ResponseGenerator.setUseModelInference(true);
-          }
-        });
-      }
-    } catch (e) {
-      console.error("Error loading AI model:", e);
-    }
-    
     // Generate AI response with a slight typing delay for realism
     setTimeout(async () => {
       try {
@@ -277,11 +243,11 @@ const MaxCore: React.FC = () => {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
-  const toggleInterface = () => {
-    setShowFullInterface(!showFullInterface);
+  const toggleChat = () => {
+    setShowChat(!showChat);
     
-    // If we're opening the interface, try to activate AI
-    if (!showFullInterface) {
+    // If we're opening the chat, try to activate AI
+    if (!showChat) {
       try {
         modelInference.preloadModel('textGeneration');
       } catch (e) {
@@ -292,76 +258,38 @@ const MaxCore: React.FC = () => {
 
   return (
     <div className="flex flex-col h-screen overflow-hidden">
-      {/* Main Background with gradient */}
-      <div className="fixed inset-0 bg-gradient-to-br from-purple-900 via-indigo-900 to-blue-900 overflow-hidden">
+      {/* Main Background with dark gradient */}
+      <div className="fixed inset-0 bg-gradient-to-br from-black via-[#0F0F1B] to-[#151530] overflow-hidden">
         {/* Animated background effects */}
         <div className="fixed inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute top-1/4 left-1/4 w-96 h-96 rounded-full bg-purple-600/20 blur-3xl"></div>
-          <div className="absolute bottom-1/3 right-1/3 w-[30rem] h-[30rem] rounded-full bg-blue-500/20 blur-3xl"></div>
-          <div className="absolute top-2/3 left-1/2 w-80 h-80 rounded-full bg-cyan-400/20 blur-3xl"></div>
+          <div className="absolute top-1/4 left-1/4 w-96 h-96 rounded-full bg-purple-900/10 blur-3xl"></div>
+          <div className="absolute bottom-1/3 right-1/3 w-[30rem] h-[30rem] rounded-full bg-teal-900/10 blur-3xl"></div>
+          <div className="absolute top-2/3 left-1/2 w-80 h-80 rounded-full bg-blue-900/10 blur-3xl"></div>
         </div>
         
         {/* Centered hologram bubble */}
         <div className="fixed inset-0 flex items-center justify-center">
-          {!showFullInterface ? (
-            // Hologram floating bubble
+          {!showChat ? (
+            // 3D Hologram center bubble
             <div 
-              onClick={toggleInterface}
-              className="cursor-pointer transition-all duration-300 ease-in-out transform"
-              style={{ transform: `scale(${pulseIntensity})` }}
+              className="cursor-pointer w-80 h-80 rounded-full transition-all duration-500"
+              onClick={toggleChat}
             >
-              <div 
-                className="relative rounded-full shadow-2xl"
-                style={{ 
-                  width: `${bubbleSize}px`, 
-                  height: `${bubbleSize}px` 
-                }}
-              >
-                {/* Outer glow */}
-                <div className="absolute inset-0 rounded-full bg-gradient-to-br from-blue-500/30 to-purple-600/30 blur-xl"></div>
-                
-                {/* Main bubble */}
-                <div className="absolute inset-0 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 opacity-90"></div>
-                
-                {/* Inner bubble with animation */}
-                <div className="absolute inset-2 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 opacity-80 flex items-center justify-center">
-                  <div className={`flex items-center justify-center h-full w-full`}>
-                    <div className="relative flex items-center justify-center">
-                      <div className={`h-16 w-16 flex items-center justify-center ${isListening || isSpeaking ? 'animate-pulse' : ''}`}>
-                        {isListening ? (
-                          // Sound wave animation when listening
-                          <div className="flex items-center justify-center space-x-1">
-                            <div className="h-5 w-1 bg-white rounded-full animate-[wave_0.5s_ease-in-out_infinite]" style={{ animationDelay: '0s' }}></div>
-                            <div className="h-8 w-1 bg-white rounded-full animate-[wave_0.5s_ease-in-out_infinite]" style={{ animationDelay: '0.1s' }}></div>
-                            <div className="h-10 w-1 bg-white rounded-full animate-[wave_0.5s_ease-in-out_infinite]" style={{ animationDelay: '0.2s' }}></div>
-                            <div className="h-8 w-1 bg-white rounded-full animate-[wave_0.5s_ease-in-out_infinite]" style={{ animationDelay: '0.3s' }}></div>
-                            <div className="h-5 w-1 bg-white rounded-full animate-[wave_0.5s_ease-in-out_infinite]" style={{ animationDelay: '0.4s' }}></div>
-                          </div>
-                        ) : isSpeaking ? (
-                          // Speaking animation
-                          <div className="flex items-center justify-center space-x-1">
-                            <div className="h-4 w-1 bg-white rounded-full animate-[wave_0.7s_ease-in-out_infinite]" style={{ animationDelay: '0s' }}></div>
-                            <div className="h-7 w-1 bg-white rounded-full animate-[wave_0.7s_ease-in-out_infinite]" style={{ animationDelay: '0.1s' }}></div>
-                            <div className="h-5 w-1 bg-white rounded-full animate-[wave_0.7s_ease-in-out_infinite]" style={{ animationDelay: '0.2s' }}></div>
-                          </div>
-                        ) : (
-                          // Idle pulsing MAX text
-                          <span className="text-white font-bold text-2xl tracking-wider animate-pulse-slow">MAX</span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <ThreeJSBubble 
+                isListening={isListening}
+                isSpeaking={isSpeaking}
+                isProcessing={isProcessing}
+                onClick={toggleChat}
+              />
             </div>
           ) : (
-            // Full interface when activated
-            <div className="absolute inset-x-4 bottom-4 top-16 bg-black/40 rounded-3xl backdrop-blur-lg border border-white/10 shadow-2xl overflow-hidden flex flex-col">
+            // Chat interface
+            <div className="absolute inset-x-4 bottom-4 top-16 bg-black/40 rounded-3xl backdrop-blur-lg border border-teal-500/20 shadow-2xl overflow-hidden flex flex-col">
               {/* Header */}
-              <div className="w-full p-4 bg-black/40 border-b border-white/10 flex justify-between items-center">
+              <div className="w-full p-4 bg-black/40 border-b border-teal-500/10 flex justify-between items-center">
                 <div className="flex items-center space-x-2">
-                  <div className={`h-3 w-3 rounded-full ${isSpeaking || isListening ? 'bg-green-400 animate-pulse' : 'bg-purple-400 animate-pulse-slow'}`} />
-                  <span className="text-purple-300 font-semibold tracking-wider text-xs md:text-sm">
+                  <div className={`h-3 w-3 rounded-full ${isSpeaking || isListening ? 'bg-teal-400 animate-pulse' : 'bg-purple-400 animate-pulse-slow'}`} />
+                  <span className="text-teal-300 font-semibold tracking-wider text-xs md:text-sm">
                     MAX {isSpeaking ? 'SPEAKING' : isListening ? 'LISTENING' : 'READY'}
                   </span>
                 </div>
@@ -369,7 +297,7 @@ const MaxCore: React.FC = () => {
                   variant="ghost"
                   size="icon"
                   className="text-white/70 hover:text-white hover:bg-white/10"
-                  onClick={toggleInterface}
+                  onClick={toggleChat}
                 >
                   <X size={18} />
                 </Button>
@@ -416,12 +344,12 @@ const MaxCore: React.FC = () => {
               </div>
               
               {/* Input area */}
-              <div className="p-4 border-t border-white/10 bg-black/30">
+              <div className="p-4 border-t border-teal-500/10 bg-black/30">
                 <div className="flex space-x-2">
                   <Button 
                     variant="outline" 
                     size="icon" 
-                    className={`${isListening ? 'bg-green-500 text-white animate-pulse' : 'bg-white/10 text-white/80'} rounded-full border-white/20 hover:bg-white/20`}
+                    className={`${isListening ? 'bg-teal-500 text-white animate-pulse' : 'bg-teal-950 text-teal-400 border-teal-800'} rounded-full hover:bg-teal-900 hover:text-teal-200`}
                     onClick={toggleListening}
                   >
                     {isListening ? <MicOff size={18} /> : <Mic size={18} />}
@@ -433,13 +361,13 @@ const MaxCore: React.FC = () => {
                       onChange={(e) => setInput(e.target.value)}
                       onKeyPress={handleKeyPress}
                       placeholder="Type your message..."
-                      className="w-full p-3 pr-10 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-white/30 min-h-[60px] max-h-[120px] resize-none"
+                      className="w-full p-3 pr-10 bg-black/60 backdrop-blur-sm border border-teal-900/50 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-teal-500/30 min-h-[60px] max-h-[120px] resize-none"
                       disabled={isProcessing}
                     />
                     <Button 
                       variant="ghost" 
                       size="icon" 
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-white/70 hover:text-white hover:bg-transparent"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-teal-400 hover:text-teal-200 hover:bg-transparent"
                       onClick={() => handleSend()}
                       disabled={!input.trim() || isProcessing}
                     >
@@ -450,6 +378,13 @@ const MaxCore: React.FC = () => {
               </div>
             </div>
           )}
+        </div>
+        
+        {/* Animated logo and brand in top-center */}
+        <div className="absolute top-4 left-0 right-0 flex justify-center">
+          <div className="text-xl md:text-2xl font-bold bg-gradient-to-r from-teal-400 via-purple-400 to-blue-400 text-transparent bg-clip-text animate-pulse-slow">
+            MAX AI ASSISTANT
+          </div>
         </div>
       </div>
     </div>
