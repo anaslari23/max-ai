@@ -1,4 +1,3 @@
-
 // Fix for WebGPU API property not existing in TypeScript definition
 interface NavigatorWithGPU extends Navigator {
   gpu?: {
@@ -119,7 +118,12 @@ class ModelInference {
     }
   }
 
-  // Adding the missing generateText method
+  /**
+   * Generates text based on a provided prompt
+   * @param prompt - Input text to generate a response for
+   * @param maxLength - Maximum length of the generated response
+   * @returns A string with the generated text response
+   */
   public async generateText(prompt: string, maxLength: number = 200): Promise<string> {
     console.log(`Generating text with prompt: "${prompt.substring(0, 50)}..." (max length: ${maxLength})`);
     
