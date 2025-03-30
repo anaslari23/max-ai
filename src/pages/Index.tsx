@@ -1,8 +1,17 @@
 
-import MaxCore from "@/components/MaxCore";
+import { useEffect } from 'react';
+import MaxCore from '@/components/MaxCore';
 
 const Index = () => {
-  return <MaxCore />;
+  useEffect(() => {
+    document.title = 'MAX AI Assistant';
+  }, []);
+
+  return (
+    <div className="h-screen w-screen overflow-hidden">
+      <MaxCore />
+    </div>
+  );
 };
 
 export default Index;

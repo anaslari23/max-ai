@@ -1,68 +1,35 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Mic, MicOff, Send, Brain, Settings, Info, MessageCircle, Zap, X } from 'lucide-react';
+import { Mic, MicOff, Send, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import AudioVisualizer from './AudioVisualizer';
 import ResponseGenerator from '../utils/ResponseGenerator';
 import VoiceRecognition from '../utils/VoiceRecognition';
 import SpeechSynthesis from '../utils/SpeechSynthesis';
 import modelInference from '../utils/ModelInference';
-import randomConversation from '../utils/RandomConversation';
-import conversationMemory from '../utils/ConversationMemory';
 
 const MaxCore: React.FC = () => {
+  // States
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<{ type: 'user' | 'max', content: string, timestamp: Date }[]>([
-    { type: 'max', content: 'Hello, I am Max. Say "Hey Max" or type your message to begin.', timestamp: new Date() }
+    { type: 'max', content: 'Hello, I am Max. Touch the hologram or type your message to begin.', timestamp: new Date() }
   ]);
   const [isListening, setIsListening] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const [isModelLoading, setIsModelLoading] = useState(false);
-  const [modelError, setModelError] = useState<string | null>(null);
   const [showFullInterface, setShowFullInterface] = useState(false);
-  const [bubbleSize, setBubbleSize] = useState(100); // Larger base size for the bubble
+  const [bubbleSize, setBubbleSize] = useState(150); // Larger base size for the bubble
   const [pulseIntensity, setPulseIntensity] = useState(1);
+  
+  // Refs
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const voiceRecognition = useRef<VoiceRecognition | null>(null);
   const speechSynthesis = useRef<SpeechSynthesis | null>(null);
   const { toast } = useToast();
   
-  // AI model status tracking
-  const [aiModelsStatus, setAiModelsStatus] = useState<Record<string, 'not_loaded' | 'loading' | 'ready' | 'error'>>({});
-  const [useAiModels, setUseAiModels] = useState(true);
-
-  // Initialize components and set up event listeners
-  useEffect(() => {
-    // Enable AI features by default
-    ResponseGenerator.setUseModelInference(useAiModels);
-    
-    // Preload AI models in the background
-    if (useAiModels) {
-      const loadModels = async () => {
-        try {
-          // Start with text generation model
-          await modelInference.preloadModel('textGeneration');
-          // Update models status in UI
-          setAiModelsStatus(modelInference.getModelStatus());
-        } catch (e) {
-          console.error("Error preloading models:", e);
-        }
-      };
-      
-      loadModels();
-      
-      // Set up periodic status check
-      const statusInterval = setInterval(() => {
-        setAiModelsStatus(modelInference.getModelStatus());
-      }, 5000);
-      
-      return () => clearInterval(statusInterval);
-    }
-  }, [useAiModels]);
-
+  // Initialize components
   useEffect(() => {
     voiceRecognition.current = new VoiceRecognition();
     speechSynthesis.current = new SpeechSynthesis();
@@ -71,11 +38,8 @@ const MaxCore: React.FC = () => {
       // Set more permissive settings for better wake word detection
       voiceRecognition.current.setConfidenceThreshold(0.25);
       voiceRecognition.current.setMaxConsecutiveLowConfidence(3);
-      voiceRecognition.current.setDebugMode(true);
-    }
-    
-    // Set up wake word detection
-    if (voiceRecognition.current) {
+      
+      // Set up wake word detection
       voiceRecognition.current.onWake(() => {
         console.log("WAKE WORD DETECTED, ACTIVATING MAX");
         
@@ -132,32 +96,7 @@ const MaxCore: React.FC = () => {
       }
     }, 1000);
     
-    // Set a timer to occasionally initiate conversation if there's been a lull
-    const inactivityTimer = setInterval(() => {
-      const lastMessageTime = messages[messages.length - 1]?.timestamp || new Date(0);
-      const timeSinceLastMessage = new Date().getTime() - lastMessageTime.getTime();
-      
-      // If it's been more than 5 minutes since the last message and we're not in the middle of something
-      if (timeSinceLastMessage > 5 * 60 * 1000 && !isListening && !isProcessing && !isSpeaking) {
-        const randomFact = randomConversation.getRandomFact();
-        const factMessage = `Here's something interesting: ${randomFact}`;
-        
-        setMessages(prev => [...prev, { 
-          type: 'max', 
-          content: factMessage, 
-          timestamp: new Date() 
-        }]);
-        
-        if (speechSynthesis.current) {
-          setIsSpeaking(true);
-          speechSynthesis.current.speak(factMessage, () => {
-            setIsSpeaking(false);
-          });
-        }
-      }
-    }, 10 * 60 * 1000); // Check every 10 minutes
-    
-    // Add bubble animation effect - more intense for Siri-like feel
+    // Add bubble animation effect
     const pulseInterval = setInterval(() => {
       if (!isListening && !isProcessing && !isSpeaking) {
         setPulseIntensity(prev => (prev === 1 ? 1.05 : 1)); // Subtle pulsing effect when idle
@@ -171,7 +110,6 @@ const MaxCore: React.FC = () => {
       if (speechSynthesis.current) {
         speechSynthesis.current.cancel();
       }
-      clearInterval(inactivityTimer);
       clearInterval(pulseInterval);
     };
   }, []);
@@ -187,16 +125,16 @@ const MaxCore: React.FC = () => {
   useEffect(() => {
     // Animate bubble size based on speech/listening status
     if (isListening) {
-      setBubbleSize(120); // Larger while listening
+      setBubbleSize(180); // Larger while listening
       setPulseIntensity(1.15);
     } else if (isSpeaking) {
-      setBubbleSize(115); // Medium-large while speaking
+      setBubbleSize(170); // Medium-large while speaking
       setPulseIntensity(1.1);
     } else if (isProcessing) {
-      setBubbleSize(110); // Medium while processing
+      setBubbleSize(160); // Medium while processing
       setPulseIntensity(1.05);
     } else if (!showFullInterface) {
-      setBubbleSize(100); // Back to normal when idle
+      setBubbleSize(150); // Back to normal when idle
       setPulseIntensity(1);
     }
   }, [isListening, isSpeaking, isProcessing, showFullInterface]);
@@ -251,7 +189,7 @@ const MaxCore: React.FC = () => {
         if (isListening) {
           stopListening();
         }
-      }, 20000); // Extended to 20 seconds for better conversation
+      }, 15000);
     }
   };
 
@@ -272,67 +210,20 @@ const MaxCore: React.FC = () => {
     setMessages(prev => [...prev, userMessage]);
     setInput('');
     setIsProcessing(true);
-    
     setIsTyping(true);
     
-    // Handle commands to enable/disable AI features
-    if (text.toLowerCase().includes('use ai') || text.toLowerCase().includes('advanced mode')) {
-      setIsModelLoading(true);
-      toast({
-        title: "Loading AI Models",
-        description: "This might take a moment as I download the needed models...",
-        duration: 5000,
-      });
-      
-      try {
-        // Try to load the text generation model
-        await modelInference.preloadModel('textGeneration');
-        setUseAiModels(true);
-        ResponseGenerator.setUseModelInference(true);
-        setIsModelLoading(false);
-        
-        setIsTyping(false);
-        setIsProcessing(false);
-        
-        const maxMessage = { 
-          type: 'max' as const, 
-          content: "I've activated my advanced AI models! I can now provide more natural and detailed responses to your questions.", 
-          timestamp: new Date() 
-        };
-        setMessages(prev => [...prev, maxMessage]);
-        
-        if (speechSynthesis.current) {
-          setIsSpeaking(true);
-          speechSynthesis.current.speak(maxMessage.content, () => {
-            setIsSpeaking(false);
-          });
-        }
-        
-        return;
-      } catch (error) {
-        console.error("Error loading AI models:", error);
-        setModelError("Couldn't load advanced AI models");
-        setIsModelLoading(false);
-        
-        const errorMessage = { 
-          type: 'max' as const, 
-          content: "I tried to activate my advanced models, but encountered an error. I'll continue using my standard response system.", 
-          timestamp: new Date() 
-        };
-        
-        setIsTyping(false);
-        setIsProcessing(false);
-        setMessages(prev => [...prev, errorMessage]);
-        
-        if (speechSynthesis.current) {
-          setIsSpeaking(true);
-          speechSynthesis.current.speak(errorMessage.content, () => {
-            setIsSpeaking(false);
-          });
-        }
-        
-        return;
+    // Try to load the AI model for better responses
+    try {
+      if (!modelInference.getModelStatus().textGeneration) {
+        modelInference.preloadModel('textGeneration').then(success => {
+          if (success) {
+            console.log("AI model loaded successfully");
+            ResponseGenerator.setUseModelInference(true);
+          }
+        });
       }
+    } catch (e) {
+      console.error("Error loading AI model:", e);
     }
     
     // Generate AI response with a slight typing delay for realism
@@ -342,9 +233,6 @@ const MaxCore: React.FC = () => {
         console.log("Generated response:", response);
         setIsTyping(false);
         setIsProcessing(false);
-        
-        // Add the exchange to memory
-        conversationMemory.addExchange(text, response.text);
         
         const maxMessage = { type: 'max' as const, content: response.text, timestamp: new Date() };
         setMessages(prev => [...prev, maxMessage]);
@@ -391,57 +279,20 @@ const MaxCore: React.FC = () => {
 
   const toggleInterface = () => {
     setShowFullInterface(!showFullInterface);
-  };
-
-  const handleFooterButtonClick = (action: string) => {
-    let responseText = '';
     
-    switch (action) {
-      case 'brain':
-        responseText = randomConversation.getRandomFact();
-        break;
-      case 'message':
-        responseText = randomConversation.getConversationStarter();
-        break;
-      case 'zap':
-        if (useAiModels) {
-          const modelInfo = modelInference.getAvailableModels();
-          const readyModels = Object.entries(modelInfo)
-            .filter(([_, info]) => info.status === 'ready')
-            .map(([name, _]) => name)
-            .join(', ');
-          
-          responseText = readyModels.length > 0 
-            ? `My AI features are active. Currently loaded models: ${readyModels}`
-            : "My AI features are enabled but no models are loaded yet. Ask me a question to activate them!";
-        } else {
-          responseText = "My advanced AI features are available. Say 'use AI' to activate them for more natural conversations.";
-        }
-        break;
-      case 'info':
-        responseText = "I'm Max, an AI assistant built with advanced voice recognition and natural language processing. I can help with information, conversations, and more.";
-        break;
-      case 'settings':
-        responseText = "My settings include voice recognition, AI features, and conversation memory. Currently running with AI " + (useAiModels ? "enabled" : "disabled") + ".";
-        break;
-      default:
-        return;
-    }
-    
-    const maxMessage = { type: 'max' as const, content: responseText, timestamp: new Date() };
-    setMessages(prev => [...prev, maxMessage]);
-    
-    if (speechSynthesis.current) {
-      setIsSpeaking(true);
-      speechSynthesis.current.speak(responseText, () => {
-        setIsSpeaking(false);
-      });
+    // If we're opening the interface, try to activate AI
+    if (!showFullInterface) {
+      try {
+        modelInference.preloadModel('textGeneration');
+      } catch (e) {
+        console.error("Error preloading model:", e);
+      }
     }
   };
 
   return (
     <div className="flex flex-col h-screen overflow-hidden">
-      {/* Main Siri-like Background */}
+      {/* Main Background with gradient */}
       <div className="fixed inset-0 bg-gradient-to-br from-purple-900 via-indigo-900 to-blue-900 overflow-hidden">
         {/* Animated background effects */}
         <div className="fixed inset-0 overflow-hidden pointer-events-none">
@@ -450,10 +301,10 @@ const MaxCore: React.FC = () => {
           <div className="absolute top-2/3 left-1/2 w-80 h-80 rounded-full bg-cyan-400/20 blur-3xl"></div>
         </div>
         
-        {/* Centered Siri-like bubble */}
+        {/* Centered hologram bubble */}
         <div className="fixed inset-0 flex items-center justify-center">
           {!showFullInterface ? (
-            // Siri-like floating bubble
+            // Hologram floating bubble
             <div 
               onClick={toggleInterface}
               className="cursor-pointer transition-all duration-300 ease-in-out transform"
@@ -476,26 +327,26 @@ const MaxCore: React.FC = () => {
                 <div className="absolute inset-2 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 opacity-80 flex items-center justify-center">
                   <div className={`flex items-center justify-center h-full w-full`}>
                     <div className="relative flex items-center justify-center">
-                      <div className={`h-12 w-12 flex items-center justify-center ${isListening || isSpeaking ? 'animate-pulse' : ''}`}>
+                      <div className={`h-16 w-16 flex items-center justify-center ${isListening || isSpeaking ? 'animate-pulse' : ''}`}>
                         {isListening ? (
                           // Sound wave animation when listening
                           <div className="flex items-center justify-center space-x-1">
-                            <div className="h-4 w-1 bg-white rounded-full animate-[wave_0.5s_ease-in-out_infinite]" style={{ animationDelay: '0s' }}></div>
-                            <div className="h-6 w-1 bg-white rounded-full animate-[wave_0.5s_ease-in-out_infinite]" style={{ animationDelay: '0.1s' }}></div>
-                            <div className="h-8 w-1 bg-white rounded-full animate-[wave_0.5s_ease-in-out_infinite]" style={{ animationDelay: '0.2s' }}></div>
-                            <div className="h-6 w-1 bg-white rounded-full animate-[wave_0.5s_ease-in-out_infinite]" style={{ animationDelay: '0.3s' }}></div>
-                            <div className="h-4 w-1 bg-white rounded-full animate-[wave_0.5s_ease-in-out_infinite]" style={{ animationDelay: '0.4s' }}></div>
+                            <div className="h-5 w-1 bg-white rounded-full animate-[wave_0.5s_ease-in-out_infinite]" style={{ animationDelay: '0s' }}></div>
+                            <div className="h-8 w-1 bg-white rounded-full animate-[wave_0.5s_ease-in-out_infinite]" style={{ animationDelay: '0.1s' }}></div>
+                            <div className="h-10 w-1 bg-white rounded-full animate-[wave_0.5s_ease-in-out_infinite]" style={{ animationDelay: '0.2s' }}></div>
+                            <div className="h-8 w-1 bg-white rounded-full animate-[wave_0.5s_ease-in-out_infinite]" style={{ animationDelay: '0.3s' }}></div>
+                            <div className="h-5 w-1 bg-white rounded-full animate-[wave_0.5s_ease-in-out_infinite]" style={{ animationDelay: '0.4s' }}></div>
                           </div>
                         ) : isSpeaking ? (
                           // Speaking animation
                           <div className="flex items-center justify-center space-x-1">
-                            <div className="h-3 w-1 bg-white rounded-full animate-[wave_0.7s_ease-in-out_infinite]" style={{ animationDelay: '0s' }}></div>
-                            <div className="h-5 w-1 bg-white rounded-full animate-[wave_0.7s_ease-in-out_infinite]" style={{ animationDelay: '0.1s' }}></div>
-                            <div className="h-4 w-1 bg-white rounded-full animate-[wave_0.7s_ease-in-out_infinite]" style={{ animationDelay: '0.2s' }}></div>
+                            <div className="h-4 w-1 bg-white rounded-full animate-[wave_0.7s_ease-in-out_infinite]" style={{ animationDelay: '0s' }}></div>
+                            <div className="h-7 w-1 bg-white rounded-full animate-[wave_0.7s_ease-in-out_infinite]" style={{ animationDelay: '0.1s' }}></div>
+                            <div className="h-5 w-1 bg-white rounded-full animate-[wave_0.7s_ease-in-out_infinite]" style={{ animationDelay: '0.2s' }}></div>
                           </div>
                         ) : (
-                          // Idle pulsing dot
-                          <div className="h-4 w-4 bg-white rounded-full opacity-80 animate-pulse-slow"></div>
+                          // Idle pulsing MAX text
+                          <span className="text-white font-bold text-2xl tracking-wider animate-pulse-slow">MAX</span>
                         )}
                       </div>
                     </div>
@@ -511,7 +362,7 @@ const MaxCore: React.FC = () => {
                 <div className="flex items-center space-x-2">
                   <div className={`h-3 w-3 rounded-full ${isSpeaking || isListening ? 'bg-green-400 animate-pulse' : 'bg-purple-400 animate-pulse-slow'}`} />
                   <span className="text-purple-300 font-semibold tracking-wider text-xs md:text-sm">
-                    MAX {isModelLoading ? 'LOADING MODELS' : isSpeaking ? 'SPEAKING' : isListening ? 'LISTENING' : 'READY'}
+                    MAX {isSpeaking ? 'SPEAKING' : isListening ? 'LISTENING' : 'READY'}
                   </span>
                 </div>
                 <Button
@@ -572,75 +423,29 @@ const MaxCore: React.FC = () => {
                     size="icon" 
                     className={`${isListening ? 'bg-green-500 text-white animate-pulse' : 'bg-white/10 text-white/80'} rounded-full border-white/20 hover:bg-white/20`}
                     onClick={toggleListening}
-                    disabled={isModelLoading}
                   >
                     {isListening ? <MicOff size={18} /> : <Mic size={18} />}
                   </Button>
                   
                   <div className="relative flex-1">
-                    <input
-                      type="text"
+                    <Textarea
                       value={input}
                       onChange={(e) => setInput(e.target.value)}
                       onKeyPress={handleKeyPress}
-                      placeholder={isModelLoading ? "Loading AI models..." : "Type your message..."}
-                      className="w-full p-3 pr-10 bg-white/10 backdrop-blur-sm border border-white/20 rounded-full text-white focus:outline-none focus:ring-2 focus:ring-white/30"
-                      disabled={isProcessing || isModelLoading}
+                      placeholder="Type your message..."
+                      className="w-full p-3 pr-10 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-white/30 min-h-[60px] max-h-[120px] resize-none"
+                      disabled={isProcessing}
                     />
                     <Button 
                       variant="ghost" 
                       size="icon" 
                       className="absolute right-2 top-1/2 -translate-y-1/2 text-white/70 hover:text-white hover:bg-transparent"
                       onClick={() => handleSend()}
-                      disabled={!input.trim() || isProcessing || isModelLoading}
+                      disabled={!input.trim() || isProcessing}
                     >
                       <Send size={18} />
                     </Button>
                   </div>
-                </div>
-                
-                {/* Footer buttons */}
-                <div className="flex justify-center mt-4 space-x-6">
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="text-white/70 hover:text-white hover:bg-white/10 rounded-full"
-                    onClick={() => handleFooterButtonClick('brain')}
-                  >
-                    <Brain size={20} />
-                  </Button>
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="text-white/70 hover:text-white hover:bg-white/10 rounded-full"
-                    onClick={() => handleFooterButtonClick('message')}
-                  >
-                    <MessageCircle size={20} />
-                  </Button>
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="text-white/70 hover:text-white hover:bg-white/10 rounded-full"
-                    onClick={() => handleFooterButtonClick('zap')}
-                  >
-                    <Zap size={20} />
-                  </Button>
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="text-white/70 hover:text-white hover:bg-white/10 rounded-full"
-                    onClick={() => handleFooterButtonClick('info')}
-                  >
-                    <Info size={20} />
-                  </Button>
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="text-white/70 hover:text-white hover:bg-white/10 rounded-full"
-                    onClick={() => handleFooterButtonClick('settings')}
-                  >
-                    <Settings size={20} />
-                  </Button>
                 </div>
               </div>
             </div>
