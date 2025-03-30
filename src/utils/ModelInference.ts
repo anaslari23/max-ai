@@ -225,7 +225,7 @@ class ModelInference {
         return response.length > maxLength ? response.substring(0, maxLength) + "..." : response;
       } catch (error) {
         console.error('Error generating text:', error);
-        return "I'm sorry, I encountered an error while processing your request. My speech recognition models are still being optimized.";
+        throw new Error("I'm sorry, I encountered an error while processing your request. My speech recognition models are still being optimized.");
       }
     } else {
       // Model not ready, provide a fallback response
