@@ -1,6 +1,6 @@
-
 /**
  * Enhanced response generator for Max AI Assistant
+ * Leverages advanced NLP for intent recognition and entity extraction
  */
 import modelInference from './ModelInference';
 import weatherService from './WeatherService';
@@ -13,6 +13,7 @@ interface ResponseData {
   shouldSpeak: boolean;
 }
 
+// Basic response templates for different intents
 const responses = {
   greeting: [
     "Hello! I'm Max, your personal assistant. How may I help you today?",
@@ -137,11 +138,51 @@ const calculationRegex = {
 };
 
 class ResponseGenerator {
-  private static useModelInference = true; // Toggle to use model inference
+  private static useModelInference = true; // Toggle to use model inference with NLP
 
   static async getResponse(input: string): Promise<ResponseData> {
+    console.log("ResponseGenerator processing input:", input);
+    
     // Normalize input
     const normalizedInput = input.toLowerCase().trim();
+    
+    // First attempt to use the NLP-enhanced model inference
+    try {
+      if (this.useModelInference) {
+        console.log('Using NLP-enhanced model inference for response generation');
+        
+        // Use the advanced text generation with NLP capabilities
+        try {
+          // We'll add conversation context for better responses
+          let prompt = `User says: "${input}". `;
+          
+          // Add conversation history for context
+          const recentHistory = conversationMemory.getRecentHistory(2);
+          if (recentHistory.length > 0) {
+            prompt += "Recent conversation: ";
+            recentHistory.forEach(entry => {
+              prompt += `User: "${entry.input}" You: "${entry.response}" `;
+            });
+          }
+          
+          const generatedText = await modelInference.generateText(prompt, 200);
+          
+          if (generatedText && generatedText.length > 10) {
+            conversationMemory.addExchange(input, generatedText, 'nlp-model-generated');
+            return { 
+              text: generatedText,
+              shouldSpeak: true
+            };
+          }
+        } catch (error) {
+          console.error('Error with NLP model inference, falling back to standard processing:', error);
+        }
+      }
+    } catch (error) {
+      console.error('Error in NLP inference path:', error);
+    }
+    
+    // If NLP-enhanced response failed, fall back to standard pattern matching
     
     // Check for calculation requests first
     const calculationResult = this.handleCalculation(normalizedInput);
@@ -249,66 +290,10 @@ class ResponseGenerator {
       return { text: randomResponse, shouldSpeak: true };
     }
     
-    // Try to use model inference for generating responses
-    try {
-      if (this.useModelInference) {
-        console.log('Using model inference for response generation');
-        
-        // Add conversation context for better responses
-        let prompt = `You are Max, an advanced AI assistant. The user says: "${input}". `;
-        
-        // Add conversation history for context
-        const recentHistory = conversationMemory.getRecentHistory(2);
-        if (recentHistory.length > 0) {
-          prompt += "Recent conversation: ";
-          recentHistory.forEach(entry => {
-            prompt += `User: "${entry.input}" You: "${entry.response}" `;
-          });
-        }
-        
-        prompt += 'Respond in a helpful, friendly, and conversational way.';
-        
-        try {
-          const generatedText = await modelInference.generateText(prompt, 150);
-          if (generatedText && generatedText.length > 10) {
-            conversationMemory.addExchange(input, generatedText, 'model-generated');
-            return { 
-              text: generatedText,
-              shouldSpeak: true
-            };
-          }
-        } catch (error) {
-          console.error('Error with model inference, falling back to template responses:', error);
-        }
-      }
-    } catch (error) {
-      console.error('Error in model inference path:', error);
-    }
-    
-    // Get response based on category (fallback if model inference failed or isn't used)
-    let responseText: string;
-    
-    // For certain categories, generate a random response from the array
-    if (category && responses[category as keyof typeof responses]) {
-      const possibleResponses = responses[category as keyof typeof responses];
-      if (Array.isArray(possibleResponses)) {
-        responseText = possibleResponses[Math.floor(Math.random() * possibleResponses.length)];
-      } else {
-        // Default to a general friendly response
-        responseText = randomConversation.getConversationStarter();
-      }
-    } else {
-      // No specific category matched, use a conversation starter
-      responseText = randomConversation.getConversationStarter();
-    }
-    
-    // Store in conversation memory
-    conversationMemory.addExchange(input, responseText, category || 'general');
-    
-    return { 
-      text: responseText,
-      shouldSpeak: true
-    };
+    // Final fallback
+    const fallbackResponse = responses.fallback[Math.floor(Math.random() * responses.fallback.length)];
+    conversationMemory.addExchange(input, fallbackResponse, 'fallback');
+    return { text: fallbackResponse, shouldSpeak: true };
   }
   
   private static handleCalculation(input: string): string | null {
