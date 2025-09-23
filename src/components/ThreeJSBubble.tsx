@@ -227,10 +227,19 @@ const ThreeJSBubble: React.FC<ThreeJSBubbleProps> = ({
     }
   }, [isListening, isSpeaking, isProcessing]);
 
+  // Subtle UI glow/scale based on state
+  const uiClass = isListening
+    ? 'scale-[1.03] drop-shadow-[0_0_20px_rgba(45,212,191,0.35)]'
+    : isSpeaking
+      ? 'scale-[1.02] drop-shadow-[0_0_16px_rgba(147,112,219,0.3)]'
+      : isProcessing
+        ? 'scale-[1.01] drop-shadow-[0_0_12px_rgba(30,144,255,0.25)]'
+        : '';
+
   return (
     <div 
       ref={containerRef} 
-      className="w-full h-full cursor-pointer"
+      className={`w-full h-full cursor-pointer transition-transform duration-300 ${uiClass}`}
       onClick={onClick}
       aria-label="MAX AI Assistant - Click to activate voice interface"
     />

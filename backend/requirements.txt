@@ -1,0 +1,57 @@
+# MAX AI with Jarvis Capabilities - Python Requirements
+
+# Core Flask and Web Framework
+Flask==2.3.3
+Flask-CORS==4.0.0
+Werkzeug==2.3.7
+
+# Machine Learning and AI
+tensorflow==2.13.0
+numpy==1.24.3
+scikit-learn==1.3.0
+nltk==3.8.1
+
+# Computer Vision
+opencv-python==4.8.1.78
+face-recognition==1.3.0
+mediapipe==0.10.3
+Pillow==10.0.1
+
+# Speech Recognition and Synthesis
+SpeechRecognition==3.10.0
+pyttsx3==2.90
+pyaudio==0.2.11
+
+# System Monitoring and Control
+psutil==5.9.5
+schedule==1.2.0
+
+# Data Processing and APIs
+requests==2.31.0
+python-dateutil==2.8.2
+pandas==2.0.3
+
+# Database
+sqlite3
+
+# Natural Language Processing
+transformers==4.33.2
+torch==2.0.1
+spacy==3.6.1
+
+# Web Scraping and Knowledge
+beautifulsoup4==4.12.2
+wikipedia==1.4.0
+
+# Audio Processing
+librosa==0.10.1
+soundfile==0.12.1
+
+# Development and Testing
+pytest==7.4.2
+black==23.7.0
+flake8==6.0.0
+
+# Additional AI/ML Libraries
+openai==0.27.8
+huggingface-hub==0.16.4

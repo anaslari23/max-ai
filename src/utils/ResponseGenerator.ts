@@ -3,10 +3,13 @@
  * Leverages advanced NLP for intent recognition and entity extraction
  */
 import modelInference from './ModelInference';
+import nluRouter from './NLURouter';
+import { runSkill } from './skills';
 import weatherService from './WeatherService';
 import directionsService from './DirectionsService';
 import conversationMemory from './ConversationMemory';
 import randomConversation from './RandomConversation';
+import { MaxJarvisAPI, ChatResponse } from './MaxJarvisAPI';
 
 interface ResponseData {
   text: string;
@@ -139,12 +142,60 @@ const calculationRegex = {
 
 class ResponseGenerator {
   private static useModelInference = true; // Toggle to use model inference with NLP
+  private static jarvisAPI = new MaxJarvisAPI();
+  private static useJarvisBackend = true; // Use enhanced Jarvis backend
 
   static async getResponse(input: string): Promise<ResponseData> {
     console.log("ResponseGenerator processing input:", input);
     
     // Normalize input
     const normalizedInput = input.toLowerCase().trim();
+    
+    // 1) Try enhanced Jarvis backend first for maximum intelligence
+    if (this.useJarvisBackend) {
+      try {
+        console.log('Using enhanced Jarvis backend for response generation');
+        
+        // Get conversation history for context
+        const recentHistory = conversationMemory.getRecentHistory(5);
+        
+        // Send to Jarvis backend for advanced processing
+        const jarvisResponse = await this.jarvisAPI.enhancedConversation(
+          input, 
+          recentHistory.map(entry => ({ type: 'user', content: entry.input }))
+        );
+        
+        // Store in conversation memory
+        conversationMemory.addExchange(input, jarvisResponse.response, jarvisResponse.intent.intent);
+        
+        // Handle specific actions if required
+        if (jarvisResponse.requires_action) {
+          await this.handleJarvisActions(jarvisResponse);
+        }
+        
+        return {
+          text: jarvisResponse.response,
+          shouldSpeak: true
+        };
+        
+      } catch (error) {
+        console.error('Error with Jarvis backend, falling back to local processing:', error);
+      }
+    }
+    
+    // 1) Try NLU router + skills first for deterministic commands
+    try {
+      const parsed = nluRouter.parse(input);
+      if (parsed.intent !== 'unknown') {
+        const skillResult = await runSkill(parsed.intent, parsed.entities);
+        if (skillResult) {
+          conversationMemory.addExchange(input, skillResult.text, parsed.intent);
+          return { text: skillResult.text, shouldSpeak: skillResult.shouldSpeak ?? true };
+        }
+      }
+    } catch (e) {
+      console.error('NLU/Skill error:', e);
+    }
     
     // First attempt to use the NLP-enhanced model inference
     try {
@@ -182,7 +233,7 @@ class ResponseGenerator {
       console.error('Error in NLP inference path:', error);
     }
     
-    // If NLP-enhanced response failed, fall back to standard pattern matching
+    // If NLU/skills and NLP-enhanced response failed, fall back to standard pattern matching
     
     // Check for calculation requests first
     const calculationResult = this.handleCalculation(normalizedInput);
@@ -346,6 +397,122 @@ class ResponseGenerator {
   
   static getWakeUpResponse(): string {
     return randomConversation.getWakeUpResponse();
+  }
+  
+  /**
+   * Handle actions required by Jarvis backend responses
+   */
+  private static async handleJarvisActions(jarvisResponse: ChatResponse): Promise<void> {
+    try {
+      const intent = jarvisResponse.intent.intent;
+      const entities = jarvisResponse.entities;
+      
+      // Handle different types of actions based on intent
+      switch (intent) {
+        case 'system_command':
+          if (entities.application && entities.application.length > 0) {
+            const appName = entities.application[0];
+            await this.jarvisAPI.openApplication(appName);
+          }
+          break;
+          
+        case 'file_operation':
+          // Handle file operations
+          console.log('File operation requested:', entities);
+          break;
+          
+        case 'schedule_task':
+          if (entities.time && entities.time.length > 0) {
+            const time = entities.time[0];
+            await this.jarvisAPI.scheduleTask('user_task', 'specific_time', time);
+          }
+          break;
+          
+        case 'weather_query':
+          // Weather is already handled in the response
+          break;
+          
+        default:
+          console.log('No specific action required for intent:', intent);
+      }
+    } catch (error) {
+      console.error('Error handling Jarvis actions:', error);
+    }
+  }
+  
+  /**
+   * Get system capabilities from Jarvis backend
+   */
+  static async getSystemCapabilities(): Promise<string[]> {
+    try {
+      const status = await this.jarvisAPI.getStatus();
+      return status.capabilities;
+    } catch (error) {
+      console.error('Error getting system capabilities:', error);
+      return [
+        'Natural Language Processing',
+        'Voice Recognition',
+        'Basic Task Automation'
+      ];
+    }
+  }
+  
+  /**
+   * Train AI models based on conversation data
+   */
+  static async trainAI(modelTypes: string[] = ['nlp', 'vision', 'automation']): Promise<boolean> {
+    try {
+      console.log('Starting AI training with Jarvis backend...');
+      const result = await this.jarvisAPI.trainModels(modelTypes);
+      console.log('Training result:', result);
+      return result.status === 'training_started';
+    } catch (error) {
+      console.error('Error training AI:', error);
+      return false;
+    }
+  }
+  
+  /**
+   * Provide feedback to improve AI responses
+   */
+  static async provideFeedback(
+    userInput: string, 
+    actualResponse: string, 
+    expectedResponse: string, 
+    rating: number
+  ): Promise<void> {
+    try {
+      await this.jarvisAPI.provideFeedback(
+        userInput,
+        expectedResponse,
+        actualResponse,
+        rating / 5.0, // Convert 1-5 rating to 0-1 score
+        'general'
+      );
+    } catch (error) {
+      console.error('Error providing feedback:', error);
+    }
+  }
+  
+  /**
+   * Toggle between different AI processing modes
+   */
+  static setProcessingMode(mode: 'jarvis' | 'local' | 'hybrid'): void {
+    switch (mode) {
+      case 'jarvis':
+        this.useJarvisBackend = true;
+        this.useModelInference = false;
+        break;
+      case 'local':
+        this.useJarvisBackend = false;
+        this.useModelInference = true;
+        break;
+      case 'hybrid':
+        this.useJarvisBackend = true;
+        this.useModelInference = true;
+        break;
+    }
+    console.log(`Switched to ${mode} processing mode`);
   }
 }
 

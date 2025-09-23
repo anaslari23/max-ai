@@ -11,15 +11,10 @@ const AudioVisualizer: React.FC<AudioVisualizerProps> = ({ isActive }) => {
 
   useEffect(() => {
     if (isActive) {
-      // Generate random heights for bars when active
       intervalRef.current = window.setInterval(() => {
-        const newBars = bars.map(() => 
-          isActive ? Math.floor(Math.random() * 35) + 5 : 5
-        );
-        setBars(newBars);
+        setBars(prev => prev.map(() => Math.floor(Math.random() * 35) + 5));
       }, 100);
     } else {
-      // Reset to minimal height when inactive
       setBars(Array(20).fill(5));
       if (intervalRef.current) {
         window.clearInterval(intervalRef.current);
@@ -35,15 +30,22 @@ const AudioVisualizer: React.FC<AudioVisualizerProps> = ({ isActive }) => {
   }, [isActive]);
 
   return (
-    <div className="audio-wave-container">
+    <div
+      className={
+        `flex items-end gap-[2px] h-6 w-40 rounded-md px-1 transition-all duration-300 ` +
+        (isActive ? 'bg-gradient-to-r from-teal-500/10 via-cyan-400/10 to-blue-500/10 drop-shadow-[0_0_12px_rgba(45,212,191,0.35)]' : 'bg-transparent')
+      }
+    >
       {bars.map((height, index) => (
         <div
           key={index}
-          className="audio-wave-bar"
-          style={{ 
+          className="w-[3px] rounded-sm"
+          style={{
             height: `${height}px`,
-            backgroundColor: `rgba(${30 + index * 5}, ${136 + index * 3}, ${229 - index * 5}, ${isActive ? 1 : 0.5})`,
-            transition: 'height 0.2s ease, background-color 0.5s ease'
+            backgroundColor: isActive
+              ? `rgba(${30 + index * 5}, ${136 + index * 3}, ${229 - index * 5}, 1)`
+              : `rgba(${30 + index * 5}, ${136 + index * 3}, ${229 - index * 5}, 0.5)`,
+            transition: 'height 0.2s ease, background-color 0.4s ease'
           }}
         />
       ))}

@@ -7,6 +7,9 @@ class SpeechSynthesis {
   private pitch: number = 1.0;
   private isLoaded: boolean = false;
   
+  // Emotion presets
+  private emotionPresets: Record<string, { rate: number; pitch: number }>[] | any;
+  
   constructor() {
     this.synthesis = window.speechSynthesis;
     this.loadVoices();
@@ -22,6 +25,14 @@ class SpeechSynthesis {
     // Set initial rate and pitch for clearer speech
     this.rate = 0.95; // Slightly slower for better clarity
     this.pitch = 1.0; // Natural pitch
+
+    this.emotionPresets = {
+      calm:    { rate: 0.9,  pitch: 0.95 },
+      neutral: { rate: 0.95, pitch: 1.0  },
+      serious: { rate: 0.85, pitch: 0.9  },
+      excited: { rate: 1.05, pitch: 1.05 },
+      friendly:{ rate: 1.0,  pitch: 1.08 },
+    };
   }
   
   private loadVoices() {
@@ -108,6 +119,27 @@ class SpeechSynthesis {
     return {
       cancel: () => this.synthesis.cancel()
     };
+  }
+
+  /**
+   * Speak with an emotional tone by adjusting rate/pitch and adding micro-pauses.
+   */
+  public speakWithEmotion(text: string, emotion: 'calm' | 'neutral' | 'serious' | 'excited' | 'friendly' = 'neutral', onEnd?: () => void) {
+    const preset = this.emotionPresets[emotion] || this.emotionPresets.neutral;
+    // Preserve original settings
+    const originalRate = this.rate;
+    const originalPitch = this.pitch;
+    try {
+      this.setRate(preset.rate);
+      this.setPitch(preset.pitch);
+      // Add subtle pauses for more natural prosody
+      const enriched = this.addPauses(text);
+      return this.speak(enriched, onEnd);
+    } finally {
+      // Restore user-preferred settings after queuing
+      this.setRate(originalRate);
+      this.setPitch(originalPitch);
+    }
   }
   
   // Helper method to add slight pauses at punctuation
